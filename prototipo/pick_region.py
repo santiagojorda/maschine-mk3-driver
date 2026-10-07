@@ -2,7 +2,7 @@
 
 Para cada pantalla: poné el mouse en la esquina superior izquierda de la zona y
 apretá Enter, después en la esquina inferior derecha y Enter. Al final imprime
-el bloque "regions" para copiar en config.json.
+la zona de cada pantalla para pegar en "regions" de config.json.
 
 Uso: python pick_region.py
 """
@@ -34,9 +34,10 @@ def pick(label):
 
 def main():
     set_dpi_aware()
-    regions = {"left": pick("pantalla izquierda"), "right": pick("pantalla derecha")}
+    picked = {"left": pick("pantalla izquierda"), "right": pick("pantalla derecha")}
     print()
-    print(json.dumps({"regions": regions}, indent=2))
+    for name, region in picked.items():
+        print(f'{name}: "regions": [{json.dumps(region)}]')
 
 
 if __name__ == "__main__":

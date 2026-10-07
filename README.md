@@ -10,9 +10,14 @@ Native Instruments y usar las pantallas a gusto. Funciona con el mapeo de
 
 ## Estado
 
-Prototipo en Python (`prototipo/`): en modo DJ (SAMPLING), las pantallas de
-la Maschine muestran dos zonas de la ventana de VirtualDJ. El programa de NI
-sigue manejando pads, botones y LEDs.
+Prototipo en Python (`prototipo/`), **funcionando** (2026-10-07): en modo DJ
+(SAMPLING), la pantalla izquierda de la Maschine muestra en vivo las ondas de
+los dos decks de VirtualDJ a ~18 cuadros por segundo. MIXER / PLUGIN vuelven a
+modo Ableton. El programa de NI sigue manejando pads, botones y LEDs.
+
+Medido: la Maschine tarda ~50 ms en recibir una pantalla completa por USB
+(~5 MB/s), así que entran ~20 pantallas completas por segundo en total.
+Convertir la imagen tarda ~1 ms y no influye.
 
 ## Usar el prototipo
 
@@ -24,8 +29,12 @@ sigue manejando pads, botones y LEDs.
    ```
 
 2. Con **Zadig** (Options → List All Devices), poner **WinUSB** solo en
-   **"Maschine MK3 (Interface 5)"**. Verificar que pads, botones y LEDs siguen
-   andando en Ableton y VirtualDJ.
+   **"Maschine MK3 BD (Interface 5)"**. No tocar "Maschine MK3 (Interface 0)"
+   (la usa el programa de NI), "Maschine MK3 HID (Interface 4)" ni
+   "Maschine MK3 DFU (Interface 6)" (firmware). Después, desenchufar y volver
+   a enchufar la Maschine: hasta entonces la interfaz no queda habilitada.
+   Si Ableton o VirtualDJ estaban abiertos, reiniciarlos para que tomen los
+   puertos MIDI de nuevo, y volver a poner la Maschine en modo MIDI.
 
 3. Desde `prototipo/`, con el Python del venv:
 
@@ -35,16 +44,37 @@ sigue manejando pads, botones y LEDs.
    | `python mode_watch.py --list` | Lista los puertos MIDI |
    | `python mode_watch.py` | Imprime DJ / ABLETON al apretar SAMPLING / MIXER / PLUGIN |
    | `python pick_region.py` | Elegir con el mouse las zonas de VirtualDJ |
-   | `python dj_screens.py` | El prototipo completo |
+   | `python dj_screens.py` | El prototipo completo (`--start dj` arranca en modo DJ; `--midi-log` muestra el MIDI que llega) |
 
-4. Copiar `config.example.json` a `config.json` y pegar las zonas que
-   imprime `pick_region.py`. `fit` puede ser `contain` (entera, con bordes),
-   `cover` (llena recortando) o `stretch` (llena deformando).
+4. Copiar `config.example.json` a `config.json`. Cada pantalla (`left`,
+   `right`) tiene:
+   - `regions`: zonas de la pantalla de la PC (las imprime `pick_region.py`),
+     apiladas de arriba a abajo. Vacío = pantalla en negro.
+   - `fit`: `contain` (entera, con bordes), `cover` (llena recortando) o
+     `stretch` (llena deformando).
+   - `fps`: cuadros por segundo. Entre las dos pantallas no pasar de ~20.
+
+   El ejemplo está hecho para VirtualDJ a pantalla completa en 1920×1200 con
+   el diseño PRO: las ondas de los dos decks, alrededor del punto de
+   reproducción.
 
 ## Volver atrás (driver de NI en las pantallas)
 
 Administrador de dispositivos → la interfaz 5 de la Maschine → Desinstalar
 dispositivo (marcando borrar el driver) → desenchufar y volver a enchufar.
+
+**Si por error Zadig le pone WinUSB a la interfaz 0** (pasa si se elige mal
+en la lista; la Maschine deja de mandar MIDI y de prender luces): buscar el
+paquete que creó Zadig con `pnputil /enum-drivers` (nombre original
+`maschine_mk3_(interface_0).inf`) y, en una terminal de administrador:
+
+```
+pnputil /delete-driver oemNN.inf /uninstall /force
+pnputil /scan-devices
+```
+
+Después, desenchufar y volver a enchufar. Windows vuelve a usar el driver de
+NI (`nimc3usb.inf`).
 
 ## Limitación conocida
 
