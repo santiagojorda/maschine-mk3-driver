@@ -2,8 +2,8 @@
 
 Modo DJ (SAMPLING): cada pantalla muestra en vivo las zonas de VirtualDJ de
 config.json, apiladas de arriba a abajo y con su propia velocidad. Modo Ableton
-(MIXER / PLUGIN): un cartel fijo, porque mientras la interfaz 5 tiene WinUSB el
-programa de NI no puede escribir su texto.
+(MIXER / PLUGIN): el texto que manda el script de Ableton por UDP
+(ableton_text.py); hasta que llega, un cartel "ABLETON".
 
 La Maschine acepta ~20 pantallas completas por segundo en total (~50 ms cada
 una), así que conviene repartir: ondas rápido, info de los decks lento. Una
@@ -19,6 +19,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from ableton_text import DEFAULT_PORT as ABLETON_TEXT_PORT
+from ableton_text import AbletonText, render_screen
 from maschine_display import HEIGHT, WIDTH, MaschineDisplays
 from mode import ABLETON, DJ, ModeWatcher
 from screen_capture import RegionCapture, set_dpi_aware
@@ -30,6 +32,7 @@ SCREEN_NAMES = ("left", "right")
 def load_config(path):
     config = json.loads(Path(path).read_text(encoding="utf-8"))
     config.setdefault("midi_port", "Maschine MK3 Ctrl MIDI")
+    config.setdefault("ableton_text_port", ABLETON_TEXT_PORT)
     for name in SCREEN_NAMES:
         screen = config["screens"][name]
         screen.setdefault("fit", "contain")
@@ -68,7 +71,9 @@ def main():
         start_mode=args.start,
         on_message=(lambda message: print(f"MIDI {message}")) if args.midi_log else None,
     )
-    print(f"Escuchando '{watcher.port_name}'. Modo inicial: {args.start.upper()}. Ctrl+C para salir.")
+    ableton_text = AbletonText(config["ableton_text_port"])
+    print(f"Escuchando '{watcher.port_name}' y el texto de Ableton en UDP {config['ableton_text_port']}. "
+          f"Modo inicial: {args.start.upper()}. Ctrl+C para salir.")
 
     ableton_banner = banner("ABLETON")
     mode = None
@@ -85,12 +90,16 @@ def main():
                 print(f"--> modo {mode.upper()}")
                 last_sent = [None, None]
                 next_due = [0.0, 0.0]
-                if mode == ABLETON:
-                    for display in range(2):
-                        displays.send_image(display, ableton_banner)
 
             if mode != DJ:
-                time.sleep(0.05)
+                for display in range(2):
+                    content = ableton_text.screen_lines(display) if ableton_text.received else "banner"
+                    if content == last_sent[display]:
+                        continue
+                    image = ableton_banner if content == "banner" else render_screen(*content)
+                    displays.send_image(display, image)
+                    last_sent[display] = content
+                time.sleep(0.03)
                 continue
 
             now = time.perf_counter()
@@ -121,6 +130,7 @@ def main():
         pass
     finally:
         watcher.close()
+        ableton_text.close()
         capture.close()
         try:
             displays.clear()
