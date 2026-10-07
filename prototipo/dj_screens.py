@@ -1,7 +1,10 @@
 """Paso 6: el prototipo completo.
 
 Modo DJ (SAMPLING): cada pantalla muestra en vivo las zonas de VirtualDJ de
-config.json, apiladas de arriba a abajo y con su propia velocidad. Modo Ableton
+config.json, apiladas de arriba a abajo y con su propia velocidad. Con
+"capture_from": "window" (por defecto) se captura la ventana de VirtualDJ en
+sí, aunque esté tapada (no minimizada), y las zonas van en coordenadas de la
+ventana; con "screen", lo que se ve en el monitor. Modo Ableton
 (MIXER / PLUGIN): el texto que manda el script de Ableton por UDP
 (ableton_text.py); hasta que llega, un cartel "ABLETON".
 
@@ -24,6 +27,7 @@ from ableton_text import AbletonText, render_screen
 from maschine_display import HEIGHT, WIDTH, MaschineDisplays
 from mode import ABLETON, DJ, ModeWatcher
 from screen_capture import RegionCapture, set_dpi_aware
+from window_capture import BackgroundWindowCapture
 
 STATS_EVERY_S = 5.0
 SCREEN_NAMES = ("left", "right")
@@ -33,10 +37,12 @@ def load_config(path):
     config = json.loads(Path(path).read_text(encoding="utf-8"))
     config.setdefault("midi_port", "Maschine MK3 Ctrl MIDI")
     config.setdefault("ableton_text_port", ABLETON_TEXT_PORT)
+    config.setdefault("capture_from", "window")
     for name in SCREEN_NAMES:
         screen = config["screens"][name]
         screen.setdefault("fit", "contain")
         screen.setdefault("fps", 10)
+        screen.setdefault("regions", [])
     return config
 
 
@@ -65,7 +71,10 @@ def main():
 
     set_dpi_aware()
     displays = MaschineDisplays()
-    capture = RegionCapture()
+    if config["capture_from"] == "window":
+        capture = BackgroundWindowCapture(fps=max(screen["fps"] for screen in screens))
+    else:
+        capture = RegionCapture()
     watcher = ModeWatcher(
         port_hint=config["midi_port"],
         start_mode=args.start,
@@ -90,6 +99,8 @@ def main():
                 print(f"--> modo {mode.upper()}")
                 last_sent = [None, None]
                 next_due = [0.0, 0.0]
+                if hasattr(capture, "set_active"):
+                    capture.set_active(mode == DJ)
 
             if mode != DJ:
                 for display in range(2):
