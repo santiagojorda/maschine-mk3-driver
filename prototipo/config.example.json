@@ -1,0 +1,9 @@
+{
+  "midi_port": "Maschine MK3 Ctrl MIDI",
+  "fps": 25,
+  "fit": "contain",
+  "regions": {
+    "left": { "left": 0, "top": 120, "width": 1920, "height": 240 },
+    "right": { "left": 0, "top": 0, "width": 1920, "height": 120 }
+  }
+}
