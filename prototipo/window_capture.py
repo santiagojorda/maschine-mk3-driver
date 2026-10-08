@@ -168,10 +168,13 @@ class BackgroundWindowCapture:
                 self.captures += 1
             time.sleep(max(0.0, self._interval - (time.perf_counter() - start)))
 
-    def grab_stack(self, regions, fit, height=HEIGHT):
+    def latest(self):
+        """Última captura de toda la ventana (numpy RGB), o None."""
         with self._lock:
-            window = self._latest
-        return stack_regions(window, regions, fit, height)
+            return self._latest
+
+    def grab_stack(self, regions, fit, height=HEIGHT):
+        return stack_regions(self.latest(), regions, fit, height)
 
     def close(self):
         self._running = False

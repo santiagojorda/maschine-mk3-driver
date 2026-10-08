@@ -20,6 +20,7 @@ MODE_CHANNEL = 1  # mido numera desde 0: 1 = canal MIDI 2
 SAMPLING_CC = 39
 MIXER_CC = 37
 PLUGIN_CC = 35
+BROWSER_CC = 38
 
 DEFAULT_PORT_HINT = "Maschine MK3 Ctrl MIDI"
 
@@ -43,11 +44,17 @@ def mode_for_message(message):
     return None
 
 
+def is_browser_press(message):
+    return (message.type == "control_change" and message.channel == MODE_CHANNEL
+            and message.control == BROWSER_CC and message.value > 0)
+
+
 class ModeWatcher:
     def __init__(self, port_hint=DEFAULT_PORT_HINT, start_mode=ABLETON, on_change=None, on_message=None):
         self._lock = threading.Lock()
         self._mode = start_mode
         self.last_button_time = 0.0  # perf_counter del último SAMPLING / MIXER / PLUGIN
+        self.browser = False  # en modo DJ, BROWSER prende y apaga la vista de carpetas y temas
         self._on_change = on_change
         self._on_message = on_message
         self.port_name = find_input_port(port_hint)
@@ -61,12 +68,17 @@ class ModeWatcher:
     def _handle(self, message):
         if self._on_message:
             self._on_message(message)
+        if is_browser_press(message):
+            with self._lock:
+                self.browser = not self.browser
+            return
         new_mode = mode_for_message(message)
         if new_mode is None:
             return
         with self._lock:
             changed = new_mode != self._mode
             self._mode = new_mode
+            self.browser = False
             self.last_button_time = time.perf_counter()
         if changed and self._on_change:
             self._on_change(new_mode)

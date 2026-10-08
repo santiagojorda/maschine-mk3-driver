@@ -1,7 +1,8 @@
 """Paso 6: el prototipo completo.
 
 Modo DJ (SAMPLING): cada pantalla muestra en vivo las zonas de VirtualDJ de
-config.json, apiladas de arriba a abajo y con su propia velocidad. Con
+config.json, apiladas de arriba a abajo y con su propia velocidad. BROWSER prende
+y apaga la vista de carpetas (izquierda) y temas (derecha) (vdj_browser.py). Con
 "capture_from": "window" (por defecto) se captura la ventana de VirtualDJ en
 sí, aunque esté tapada (no minimizada), y las zonas van en coordenadas de la
 ventana; con "screen", lo que se ve en el monitor. Modo Ableton
@@ -31,11 +32,14 @@ from ableton_ui import screen_kind, wants_graphics
 from maschine_display import HEIGHT, WIDTH, MaschineDisplays
 from mode import ABLETON, DJ, ModeWatcher
 from screen_capture import RegionCapture, set_dpi_aware
+from vdj_browser import BrowserView
 from window_capture import BackgroundWindowCapture
 
 STATS_EVERY_S = 5.0
 SCREEN_NAMES = ("left", "right")
 ABLETON_FPS = 30
+BROWSER_FPS = 12
+BROWSER_LISTS = ("folders", "songs")  # pantalla izquierda, derecha
 
 
 class MeterSmoother:
@@ -116,7 +120,9 @@ def main():
           f"Modo inicial: {args.start.upper()}. Ctrl+C para salir.")
 
     ableton_banner = banner("ABLETON")
+    browser_view = BrowserView(config.get("browser"))
     mode = None
+    showing_browser = False
     next_due = [0.0, 0.0]
     last_sent = [None, None]
     last_frame = [None, None]  # última imagen mandada en modo gráfico, para mandar solo lo que cambia
@@ -142,6 +148,27 @@ def main():
                   if mode == DJ:
                       # Las bandas fuera de la zona de cada pantalla quedan en negro desde acá
                       displays.clear()
+
+              browser = mode == DJ and watcher.browser
+              if browser != showing_browser:
+                  showing_browser = browser
+                  print("--> browser" if browser else "--> ondas")
+                  last_sent = [None, None]
+                  last_frame = [None, None]
+                  next_due = [0.0, 0.0]
+                  if mode == DJ and not browser:
+                      displays.clear()
+
+              if browser:
+                  frame_start = time.perf_counter()
+                  window = capture.latest() if hasattr(capture, "latest") else None
+                  for display, name in enumerate(BROWSER_LISTS):
+                      rgb = browser_view.render(window, name)
+                      if displays.send_changes(display, rgb, last_frame[display]):
+                          sent[display] += 1
+                      last_frame[display] = rgb
+                  time.sleep(max(0.0, 1.0 / BROWSER_FPS - (time.perf_counter() - frame_start)))
+                  continue
 
               if mode != DJ:
                   frame_start = time.perf_counter()
