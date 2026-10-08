@@ -266,9 +266,10 @@ def _draw_clip(draw, box, slot, dim, text_color):
         draw.rectangle(box, outline=PLAYING_BORDER if slot.get("playing") else RECORDING, width=3)
 
 
-def render_session(state, display):
-    """Grilla de clips: un bloque fijo de 8 tracks (4 por pantalla) x 4 escenas. Las columnas que están
-    en los pads se ven normales y las demás, más tenues; mover los pads dentro del bloque solo mueve el resaltado."""
+def render_session(state, display, pads_frame=True):
+    """Grilla de clips: un bloque de 8 tracks (4 por pantalla) x 4 escenas. Las columnas que están en los
+    pads se ven normales y las demás, más tenues; mover los pads dentro del bloque solo mueve el resaltado.
+    pads_frame=False: sin el marco verde (la grilla al lado del browser)."""
     image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
     draw = ImageDraw.Draw(image)
     session = state.get("session") or {}
@@ -306,17 +307,73 @@ def render_session(state, display):
                 font = _font(15, True)
                 draw.text((bx0 + 6, by0 + 3), _fit_text(draw, name, font, bx1 - bx0 - 12), font=font, fill=(0, 0, 0))
 
-    # Pop-up chico del volumen de la perilla que se toca: tapa las 2 celdas de abajo de su columna
+    # Pop-up chico de la perilla que se toca: tapa las 2 celdas de abajo de su columna.
+    # Volumen (flecha izquierda) o un parámetro del dispositivo (flecha derecha)
     touched = state.get("touched", -1)
     knobs = state.get("knobs") or []
+    fx_page = session.get("knob_page") == "fx"
     if 0 <= touched < len(knobs) and knobs[touched] and touched // COLUMNS == display:
         x0 = (touched % COLUMNS) * COLUMN_WIDTH
         top = TRACK_STRIP_HEIGHT + (SESSION_ROWS - 2) * row_height
-        _draw_volume_popup(draw, knobs[touched], (x0 + 2, top + 2, x0 + COLUMN_WIDTH - 3,
-                                                  TRACK_STRIP_HEIGHT + SESSION_ROWS * row_height - 3))
+        box = (x0 + 2, top + 2, x0 + COLUMN_WIDTH - 3, TRACK_STRIP_HEIGHT + SESSION_ROWS * row_height - 3)
+        if fx_page:
+            device_color = state.get("device_color")
+            color = _track_rgb(device_color if device_color is not None else state.get("track_color"))
+            _draw_parameter_popup(draw, knobs[touched], box, color)
+        else:
+            _draw_volume_popup(draw, knobs[touched], box)
 
-    _draw_pads_frame(draw, display, ring_start, ring_end)
+    if pads_frame:
+        _draw_pads_frame(draw, display, ring_start, ring_end)
+    _draw_page_notice(draw, display, session.get("knob_page"), state.get("device"))
     return image
+
+
+PAGE_NOTICE_SECONDS = 1.5
+_page_notice = {"page": None, "time": 0.0}
+
+
+def _draw_page_notice(draw, display, page, device):
+    """Al cambiar con las flechas qué manejan las perillas, un cartel en la pantalla derecha lo dice."""
+    if page is None:
+        return
+    now = time.perf_counter()
+    if page != _page_notice["page"]:
+        # La primera vez (al entrar a la vista session) no se avisa
+        _page_notice["time"] = now if _page_notice["page"] is not None else 0.0
+        _page_notice["page"] = page
+    if display != 1 or now - _page_notice["time"] > PAGE_NOTICE_SECONDS:
+        return
+    text = "PERILLAS: VOLUMEN" if page != "fx" else f"PERILLAS: {device or 'FX'}"
+    box = (40, HEIGHT // 2 - 30, WIDTH - 40, HEIGHT // 2 + 30)
+    draw.rectangle(box, fill=(18, 18, 18), outline=TEXT, width=2)
+    _centered(draw, text, WIDTH // 2, HEIGHT // 2 - 14, _font(22, True), TEXT, width=box[2] - box[0] - 16)
+
+
+def _draw_parameter_popup(draw, knob, box, color):
+    """Un parámetro del dispositivo en el recuadro chico: nombre, valor y una perilla redonda."""
+    left, top, right, bottom = box
+    center = (left + right) // 2
+    draw.rectangle(box, fill=(18, 18, 18), outline=TEXT, width=2)
+    draw.rectangle((left + 2, top + 2, right - 2, top + 24), fill=color)
+    _centered(draw, knob.get("name"), center, top + 5, _font(14, True), _text_color_on(color), width=right - left - 10)
+    _centered(draw, knob.get("text"), center, top + 28, _font(17, True), TEXT, width=right - left - 8)
+    radius, width = 24, 7
+    center_y = (top + 54 + bottom - 6) // 2 + 4
+    arc_box = (center - radius, center_y - radius, center + radius, center_y + radius)
+    start, end = 135, 405
+    value = max(0.0, min(1.0, knob.get("value", 0.0)))
+    angle = start + value * (end - start)
+    draw.arc(arc_box, start, end, fill=GROOVE, width=width)
+    if knob.get("bipolar"):
+        middle = (start + end) / 2
+        if abs(angle - middle) > 0.5:
+            draw.arc(arc_box, min(middle, angle), max(middle, angle), fill=_visible(color), width=width)
+    elif angle > start:
+        draw.arc(arc_box, start, angle, fill=_visible(color), width=width)
+    rad = math.radians(angle)
+    draw.line((center + radius * 0.2 * math.cos(rad), center_y + radius * 0.2 * math.sin(rad),
+               center + radius * 0.75 * math.cos(rad), center_y + radius * 0.75 * math.sin(rad)), fill=TEXT, width=3)
 
 
 def _draw_pads_frame(draw, display, ring_start, ring_end):
@@ -399,26 +456,26 @@ def _draw_browser_list(draw, listing):
 
 
 def render_browser(state, display):
-    """Browser de Live: a la izquierda la carpeta de arriba (dónde estás), a la derecha lo que hay adentro."""
-    image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
-    draw = ImageDraw.Draw(image)
+    """Browser de Live, como el de VirtualDJ: la lista a la derecha. A la izquierda, la grilla de clips
+    (4 tracks x 4 escenas) alrededor del lugar seleccionado, para ver dónde va a caer lo que se cargue;
+    se corre de a 4 tracks y de a 1 escena cuando la selección sale de ella."""
     browser = state["browser"]
     path = browser.get("path") or []
     if display == 0:
-        parent = browser.get("parent")
-        if parent is None:
-            _header(draw, "BROWSER", "PREVIEW" if browser.get("preview") else None)
-            draw.text((10, HEADER_HEIGHT + 12), "Elegí una categoría", font=_font(17, True), fill=DIM_TEXT)
-            return image
-        title = parent.get("name") if len(path) <= 1 else path[-2]
-        _header(draw, "BROWSER" if len(path) <= 1 else title, "PREVIEW" if browser.get("preview") else None)
-        _draw_browser_list(draw, parent)
-    else:
-        listing = browser.get("list") or {}
-        count = listing.get("count", 0)
-        position = f"{listing.get('selected', 0) + 1}/{count}" if count else "vacía"
-        _header(draw, " > ".join(path) if path else "BROWSER", position)
-        _draw_browser_list(draw, listing)
+        grid = state.get("browser_grid")
+        if not grid:
+            return Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
+        grid_state = {"session": {"tracks": grid.get("tracks") or [], "page_offset": grid.get("page_offset", 0),
+                                  "scene_offset": grid.get("scene_offset", 0), "ring_column": 0,
+                                  "ring_tracks": COLUMNS}}
+        return render_session(grid_state, 0, pads_frame=False)
+    image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
+    draw = ImageDraw.Draw(image)
+    listing = browser.get("list") or {}
+    count = listing.get("count", 0)
+    position = f"{listing.get('selected', 0) + 1}/{count}" if count else "vacía"
+    _header(draw, " > ".join(path) if path else "BROWSER", position)
+    _draw_browser_list(draw, listing)
     return image
 
 
