@@ -1,22 +1,24 @@
-"""Recibe de VirtualDJ el estado de cada deck por un puerto MIDI virtual.
+"""Recibe de VirtualDJ el estado de cada deck.
 
-El prototipo crea el puerto "MK3 Screens" con teVirtualMIDI (viene con
-loopMIDI). VirtualDJ lo ve como un controlador más (vdj/generar.py) y le
-manda textos por sysex: F0 7D <campo> <texto> F7, con campo = deck * 16 + código
-(ver FIELDS en vdj/generar.py). VirtualDJ manda cada texto cuando cambia.
+VirtualDJ lo manda al puerto MIDI virtual "MK3 Screens" como un controlador más
+(vdj/generar.py): textos por sysex F0 7D <campo> <texto> F7, con campo = deck * 16 +
+código (ver FIELDS en vdj/generar.py), cada uno cuando cambia.
 
-El puerto se abre sin que el driver arme los mensajes: el título en UTF-8 trae
-bytes de 8 bits que cortarían un sysex, así que se juntan acá de F0 a F7.
+El puerto lo crea vdj_puerto.py, un proceso aparte que no se reinicia con el
+prototipo: si el puerto desapareciera, VirtualDJ no se reconecta hasta reiniciarlo.
+vdj_puerto.py pasa cada sysex por UDP a este módulo y guarda el último valor de cada
+campo, así un prototipo recién arrancado pide todo y no espera a que algo cambie.
 """
 
-import ctypes
-import ctypes.wintypes as W
+import socket
 import threading
 import time
 import unicodedata
 
-PORT_NAME = "MK3 Screens"
 SYSEX_ID = 0x7D  # "uso no comercial / experimental"
+BRIDGE_ADDRESS = ("127.0.0.1", 9018)  # vdj_puerto.py: acá se le piden todos los valores
+DATA_PORT = 9019  # vdj_puerto.py manda acá cada sysex (sin F0 / F7)
+REQUEST_ALL = b"todo"
 
 FIELDS = {
     1: "title", 2: "artist", 3: "bpm", 4: "bpm_original", 5: "playing", 6: "volume", 7: "filter",
@@ -25,9 +27,6 @@ FIELDS = {
 THOUSANDTHS = ("bpm", "bpm_original", "volume", "filter")
 LOOP_LENGTHS = tuple(2.0 ** power for power in range(-5, 7))  # 1/32 ... 64 beats
 FLAGS = ("playing", "keylock", "loop", "loaded")
-
-_MIDI_DATA_CALLBACK = ctypes.WINFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_ubyte), W.DWORD, ctypes.c_void_p)
-
 
 def _parse_loop(text):
     """Largo del loop en beats, al valor de la lista más cercano: VirtualDJ lo da como "4", "0.5" o "1/2"
@@ -78,29 +77,35 @@ class VdjData:
         self.decks = [DeckState(), DeckState()]
         self.lock = threading.Lock()
         self.messages = 0
-        self._buffer = None  # bytes del sysex en curso
-        dll = ctypes.WinDLL("teVirtualMIDI64.dll")
-        dll.virtualMIDICreatePortEx2.restype = ctypes.c_void_p
-        dll.virtualMIDICreatePortEx2.argtypes = [W.LPCWSTR, _MIDI_DATA_CALLBACK, ctypes.c_void_p, W.DWORD, W.DWORD]
-        dll.virtualMIDIClosePort.argtypes = [ctypes.c_void_p]
-        self._dll = dll
-        self._callback = _MIDI_DATA_CALLBACK(self._on_data)  # hay que guardar la referencia
-        self._port = dll.virtualMIDICreatePortEx2(PORT_NAME, self._callback, None, 0x1FFFE, 0)
-        if not self._port:
-            raise RuntimeError(f"No se pudo crear el puerto virtual '{PORT_NAME}' (¿está instalado loopMIDI / teVirtualMIDI?)")
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._socket.bind(("127.0.0.1", DATA_PORT))
+        self._socket.settimeout(1.0)
+        self._running = True
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
 
-    def _on_data(self, port, data, length, instance):
-        if not data or not length:
-            return
-        for byte in bytes(data[:length]):
-            if byte == 0xF0:
-                self._buffer = bytearray()
-            elif byte == 0xF7:
-                if self._buffer is not None:
-                    self._handle(bytes(self._buffer))
-                self._buffer = None
-            elif self._buffer is not None:
-                self._buffer.append(byte)
+    def _request_all(self):
+        try:
+            self._socket.sendto(REQUEST_ALL, BRIDGE_ADDRESS)
+        except OSError:
+            pass
+
+    def _loop(self):
+        self._request_all()
+        last_request = time.perf_counter()
+        while self._running:
+            try:
+                message, _ = self._socket.recvfrom(4096)
+                self._handle(message)
+            except (socket.timeout, ConnectionResetError):
+                pass
+            except OSError:
+                if not self._running:
+                    return
+            # Si todavía no llegó nada (el puente arrancó después), se vuelve a pedir
+            if not self.messages and time.perf_counter() - last_request > 2.0:
+                self._request_all()
+                last_request = time.perf_counter()
 
     def _handle(self, message):
         if len(message) < 2 or message[0] != SYSEX_ID:
@@ -133,6 +138,5 @@ class VdjData:
                 deck.values[name] = value
 
     def close(self):
-        if self._port:
-            self._dll.virtualMIDIClosePort(self._port)
-            self._port = None
+        self._running = False
+        self._socket.close()

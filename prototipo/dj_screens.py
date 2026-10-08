@@ -20,6 +20,8 @@ Uso: python dj_screens.py [--config config.json] [--start dj]
 
 import argparse
 import json
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -86,6 +88,21 @@ def load_config(path):
     return config
 
 
+def start_vdj_port():
+    """Lanza vdj_puerto.py aparte, para que sobreviva a los reinicios del prototipo (si ya corre, sale solo)."""
+    log = Path(__file__).resolve().parent.parent / ".venv" / "vdj_puerto.log"
+    flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    for extra in (0x01000000, 0):  # CREATE_BREAKAWAY_FROM_JOB, si el job lo permite
+        try:
+            with open(log, "a", encoding="utf-8") as output:
+                subprocess.Popen([sys.executable, "-u", str(Path(__file__).with_name("vdj_puerto.py"))],
+                                 cwd=str(Path(__file__).parent), stdout=output, stderr=output,
+                                 stdin=subprocess.DEVNULL, creationflags=flags | extra, close_fds=True)
+            return
+        except OSError:
+            continue
+
+
 def banner(text):
     image = Image.new("RGB", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(image)
@@ -121,9 +138,10 @@ def main():
         on_message=(lambda message: print(f"MIDI {message}")) if args.midi_log else None,
     )
     ableton_text = AbletonText(config["ableton_text_port"])
+    start_vdj_port()
     try:
         vdj_data = VdjData()
-        print("Puerto 'MK3 Screens' creado: VirtualDJ manda ahí el estado de los decks")
+        print("Escuchando los datos de VirtualDJ (puerto 'MK3 Screens', vdj_puerto.py)")
     except Exception as error:
         vdj_data = None
         print(f"Sin datos de VirtualDJ: {error}")
@@ -254,7 +272,8 @@ def main():
 
               elapsed = time.perf_counter() - stats_start
               if elapsed >= STATS_EVERY_S:
-                  print(f"fps enviados: izquierda {sent[0] / elapsed:.1f}, derecha {sent[1] / elapsed:.1f}")
+                  print(f"fps enviados: izquierda {sent[0] / elapsed:.1f}, derecha {sent[1] / elapsed:.1f}; "
+                        f"datos de VirtualDJ: {vdj_data.messages if vdj_data else 'sin puerto'}")
                   sent = [0, 0]
                   stats_start = time.perf_counter()
 
