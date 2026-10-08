@@ -24,6 +24,7 @@ SONG_ROW_HEIGHT = 48  # dos líneas (título y artista) al lado de la tapa
 SONG_ROW_MIN, SONG_ROW_MAX = 28, 60  # alto de una fila de VirtualDJ (para no tomar el espacio vacío de abajo)
 TEXT_BAND = 24
 SONG_COLUMNS_NEEDED = 5  # separadores 0..5
+NOTE_MIN_PIXELS = 20  # píxeles gris claro del ícono de la nota en una fila de tema
 
 DEFAULT_LAYOUT = {
     # Coordenadas de la ventana de VirtualDJ (pantalla completa 1920 x 1200, skin PRO)
@@ -32,7 +33,8 @@ DEFAULT_LAYOUT = {
     # Las columnas se buscan en el encabezado (header_y, entre header_left y header_right): se corren si la
     # lista cambia de ancho. Orden de VirtualDJ: portada, título, artista, duración, BPM...; "columns" queda
     # por si no se encuentran.
-    "songs": {"title": "TEMAS", "top": 618, "height": 540, "columns": [[610, 1030], [1105, 1195]],
+    # height llega hasta el borde de la lista (1190): sin la barra de LiveFeedback abajo, la lista ocupa todo
+    "songs": {"title": "TEMAS", "top": 618, "height": 572, "columns": [[610, 1030], [1105, 1195]],
               "played": [462, 506], "header_y": 597, "header_left": 480, "header_right": 1440,
               "header_columns": [[1, 3], [4, 5]]},
 }
@@ -151,7 +153,12 @@ class BrowserView:
         # Las filas se separan por el fondo en una franja sin texto (a la izquierda de la duración, que va
         # alineada a la derecha): en la columna del título, un nombre largo tapa el fondo y partía la fila
         strip = window[top:top + height, separators[3] + 2:separators[3] + 14]
-        rows = [(start, end) for start, end in _row_bounds(strip) if SONG_ROW_MIN <= end - start <= SONG_ROW_MAX]
+        left, right = zone["played"]
+        icons = window[top:top + height, left:right]
+        # Solo filas con el ícono de la nota (gris claro): así la barra de LiveFeedback no cuenta como tema
+        note = (icons.min(axis=2) > 160) & (icons.max(axis=2) - icons.min(axis=2) < 40)
+        rows = [(start, end) for start, end in _row_bounds(strip)
+                if SONG_ROW_MIN <= end - start <= SONG_ROW_MAX and note[start:end].sum() >= NOTE_MIN_PIXELS]
         if not rows:
             return np.asarray(image)
         brightness = [float(np.median(strip[start:end].mean(axis=2))) for start, end in rows]
@@ -164,8 +171,6 @@ class BrowserView:
         self._last_center["song_row"] = index
         visible = (HEIGHT - HEADER_HEIGHT) // SONG_ROW_HEIGHT
         first = max(0, min(index - visible // 2, len(rows) - visible))
-        left, right = zone["played"]
-        icons = window[top:top + height, left:right]
         red = (icons[..., 0] > 170) & (icons[..., 1] < 70) & (icons[..., 2] < 70)
         played_lines = red.sum(axis=1) >= PLAYED_RED_MIN_WIDTH
 
