@@ -456,19 +456,21 @@ def _draw_browser_list(draw, listing):
 
 
 def render_browser(state, display):
-    """Browser de Live, como el de VirtualDJ: la lista a la derecha. A la izquierda, la grilla de clips
-    (4 tracks x 4 escenas) alrededor del lugar seleccionado, para ver dónde va a caer lo que se cargue;
-    se corre de a 4 tracks y de a 1 escena cuando la selección sale de ella."""
+    """Browser de Live, como el de VirtualDJ: la lista a la derecha. A la izquierda, la grilla actual de
+    la vista session (los 4 tracks de los pads, con su marco verde), para ver dónde va a caer lo que se
+    cargue; si la selección sale de los pads, se corren 4 tracks o 1 escena, como en la vista session."""
     browser = state["browser"]
     path = browser.get("path") or []
     if display == 0:
         grid = state.get("browser_grid")
         if not grid:
             return Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
-        grid_state = {"session": {"tracks": grid.get("tracks") or [], "page_offset": grid.get("page_offset", 0),
+        first = grid.get("ring_column", 0)
+        grid_state = {"session": {"tracks": (grid.get("tracks") or [])[first:first + COLUMNS],
+                                  "page_offset": grid.get("page_offset", 0) + first,
                                   "scene_offset": grid.get("scene_offset", 0), "ring_column": 0,
                                   "ring_tracks": COLUMNS}}
-        return render_session(grid_state, 0, pads_frame=False)
+        return render_session(grid_state, 0)
     image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
     draw = ImageDraw.Draw(image)
     listing = browser.get("list") or {}
