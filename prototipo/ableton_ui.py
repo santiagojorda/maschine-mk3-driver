@@ -226,6 +226,9 @@ PLAYING = (60, 220, 90)
 PADS_FRAME = (0, 230, 80)  # marco de las columnas que están en los pads
 PADS_FRAME_WIDTH = 4
 RECORDING = (230, 50, 40)
+PLAYING_BORDER = (165, 165, 165)  # gris: el blanco queda para el clip seleccionado
+SESSION_TEXT = (0, 0, 0)  # en session todo el texto va en negro...
+TARGET_TEXT = (255, 255, 255)  # ...menos el del track seleccionado o fijado
 BLINK_SECONDS = 0.25
 
 
@@ -233,7 +236,7 @@ def _dim(rgb, factor):
     return tuple(int(channel * factor) for channel in rgb)
 
 
-def _draw_clip(draw, box, slot, dim):
+def _draw_clip(draw, box, slot, dim, text_color):
     x0, y0, x1, y1 = box
     if slot is None:
         return
@@ -245,7 +248,6 @@ def _draw_clip(draw, box, slot, dim):
     color = _dim(_track_rgb(slot.get("color")), dim)
     blink_off = slot.get("triggered") and int(time.perf_counter() / BLINK_SECONDS) % 2
     draw.rectangle(box, fill=_dim(color, 0.45) if blink_off else color)
-    text_color = _text_color_on(color)
     left = x0 + 6
     if slot.get("recording"):
         draw.ellipse((x0 + 6, y0 + 7, x0 + 18, y0 + 19), fill=RECORDING, outline=(255, 255, 255))
@@ -257,8 +259,8 @@ def _draw_clip(draw, box, slot, dim):
     name = _fit_text(draw, slot.get("name") or "", font, x1 - left - 4)
     draw.text((left, y0 + 5), name, font=font, fill=text_color)
     if slot.get("playing") or slot.get("recording"):
-        # Blanco y no verde: el verde marca la zona de los pads
-        draw.rectangle(box, outline=TEXT if slot.get("playing") else RECORDING, width=3)
+        # Gris y no verde: el verde marca la zona de los pads y el blanco, el clip seleccionado
+        draw.rectangle(box, outline=PLAYING_BORDER if slot.get("playing") else RECORDING, width=3)
 
 
 def render_session(state, display):
@@ -276,20 +278,21 @@ def render_session(state, display):
     for column in range(COLUMNS):
         index = display * COLUMNS + column
         track = tracks[index] if index < len(tracks) else None
-        dim = 1.0 if ring_start <= index < ring_end else 0.65
+        dim = 1.0 if ring_start <= index < ring_end else 0.8
         x0 = column * COLUMN_WIDTH
         if track is None:
             continue
         color = _dim(_track_rgb(track.get("color")), dim)
         draw.rectangle((x0 + 2, 0, x0 + COLUMN_WIDTH - 3, TRACK_STRIP_HEIGHT - 3), fill=color)
+        text_color = TARGET_TEXT if track.get("target") else SESSION_TEXT
         label = f"{first_track + index} {track.get('name') or ''}"
-        _centered(draw, label, x0 + COLUMN_WIDTH // 2, 4, _font(14, True), _text_color_on(color))
+        _centered(draw, label, x0 + COLUMN_WIDTH // 2, 4, _font(14, True), text_color)
         slots = track.get("slots") or []
         for row in range(SESSION_ROWS):
             top = TRACK_STRIP_HEIGHT + row * row_height
             box = (x0 + 2, top + 2, x0 + COLUMN_WIDTH - 3, top + row_height - 3)
             slot = slots[row] if row < len(slots) else None
-            _draw_clip(draw, box, slot, dim)
+            _draw_clip(draw, box, slot, dim, text_color)
             if slot and slot.get("selected"):
                 # El clip seleccionado en Live, como un cursor: borde blanco grueso y el nombre invertido
                 # (franja blanca, letras negras); se distingue sobre cualquier color
@@ -343,15 +346,20 @@ def _draw_volume_popup(draw, knob, box):
               _text_color_on(color), width=right - left - 10)
     _centered(draw, knob.get("text"), center, top + 32, _font(22, True), TEXT, width=right - left - 10)
 
-    # Barra de volumen con el medidor del track debajo
-    bar_left, bar_right, bar_top = left + 8, right - 8, bottom - 30
+    # Fader horizontal: canal con el relleno del color del track, una línea blanca en la posición
+    # y el medidor del track debajo
+    bar_left, bar_right, groove_y = left + 10, right - 10, bottom - 30
     value = max(0.0, min(1.0, knob.get("value", 0.0)))
-    draw.rectangle((bar_left, bar_top, bar_right, bar_top + 12), fill=GROOVE)
-    draw.rectangle((bar_left, bar_top, bar_left + value * (bar_right - bar_left), bar_top + 12), fill=_visible(color))
+    position = bar_left + value * (bar_right - bar_left)
+    draw.rectangle((bar_left, groove_y - 3, bar_right, groove_y + 3), fill=GROOVE)
+    if position > bar_left:
+        draw.rectangle((bar_left, groove_y - 3, position, groove_y + 3), fill=_visible(color))
+    draw.rectangle((position - 2, groove_y - 10, position + 2, groove_y + 10), fill=TOUCHED)
     meter = max(0.0, min(1.0, knob.get("meter") or 0.0))
-    draw.rectangle((bar_left, bar_top + 17, bar_right, bar_top + 23), fill=(25, 25, 25))
+    meter_top = groove_y + 15
+    draw.rectangle((bar_left, meter_top, bar_right, meter_top + 6), fill=(25, 25, 25))
     if meter > 0:
-        draw.rectangle((bar_left, bar_top + 17, bar_left + meter * (bar_right - bar_left), bar_top + 23),
+        draw.rectangle((bar_left, meter_top, bar_left + meter * (bar_right - bar_left), meter_top + 6),
                        fill=_meter_color(meter))
 
 
