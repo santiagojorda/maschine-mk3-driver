@@ -20,6 +20,10 @@ MAX_SCALE = 1.0  # no agranda: se vería borroso
 PLAYED_GUTTER = 30  # columna a la izquierda con la marca de "ya pasado"
 PLAYED_RED_MIN_WIDTH = 16  # la raya roja de "ya pasado" cruza todo el ícono; el globo rojo de TIDAL es más angosto
 PLAYED = (235, 40, 40)
+SONG_ROW_HEIGHT = 48  # dos líneas (título y artista) al lado de la tapa
+SONG_ROW_MIN, SONG_ROW_MAX = 28, 60  # alto de una fila de VirtualDJ (para no tomar el espacio vacío de abajo)
+TEXT_BAND = 24
+SONG_COLUMNS_NEEDED = 5  # separadores 0..5
 
 DEFAULT_LAYOUT = {
     # Coordenadas de la ventana de VirtualDJ (pantalla completa 1920 x 1200, skin PRO)
@@ -88,15 +92,19 @@ class BrowserView:
         self.focus = "songs"
         self._last_center = {}  # si no se ve la selección (por ejemplo, al scrollear) se queda donde estaba
 
-    def _columns(self, window, zone):
-        """Columnas a mostrar, buscadas por los separadores del encabezado (líneas de 1 px oscuras)."""
+    @staticmethod
+    def _separators(window, zone):
+        """x de los separadores del encabezado (líneas de 1 px oscuras), o [] si no hay encabezado."""
         if "header_y" not in zone:
-            return zone["columns"]
+            return []
         y, left, right = zone["header_y"], zone["header_left"], zone["header_right"]
         band = window[y:y + 3, left:right].mean(axis=(0, 2))
-        separators = [left + x for x in range(1, len(band) - 1)
-                      if band[x] < 30 and band[x - 1] > 40 and band[x + 1] > 40]
-        needed = max(index for pair in zone["header_columns"] for index in pair)
+        return [left + x for x in range(1, len(band) - 1) if band[x] < 30 and band[x - 1] > 40 and band[x + 1] > 40]
+
+    def _columns(self, window, zone):
+        """Columnas a mostrar, buscadas por los separadores del encabezado."""
+        separators = self._separators(window, zone)
+        needed = max(index for pair in zone["header_columns"] for index in pair) if "header_columns" in zone else 0
         if len(separators) <= needed:
             return zone["columns"]
         return [[separators[first], separators[last]] for first, last in zone["header_columns"]]
@@ -123,18 +131,78 @@ class BrowserView:
             folders, songs = rows["folders"][2], rows["songs"][2]
             if abs(folders - songs) >= 8:
                 self.focus = "folders" if folders > songs else "songs"
+        if self.focus == "songs":
+            separators = self._separators(window, zone)
+            if len(separators) > SONG_COLUMNS_NEEDED:
+                return self._render_songs(window, zone, separators, rows["songs"])
         return self._render(lists[self.focus], rows[self.focus], self.focus, played)
+
+    def _render_songs(self, window, zone, separators, selected):
+        """Temas en filas de dos líneas: la tapa a la izquierda, título arriba y artista abajo, BPM a la derecha.
+        Entran menos temas, pero se reconoce cada uno por su tapa. Separadores del encabezado:
+        0 | portada | 1 | título | 2 | artista | 3 | duración | 4 | BPM | 5."""
+        image = Image.new("RGB", (WIDTH, HEIGHT))
+        draw = ImageDraw.Draw(image)
+        self._header(draw, "songs")
+        top, height = zone["top"], zone["height"]
+        cover_x, title_x, artist_x = separators[0] + 1, separators[1], separators[2]
+        bpm_x, bpm_end = separators[4], separators[5]
+        titles = window[top:top + height, title_x:artist_x]
+        rows = [(start, end) for start, end in _row_bounds(titles) if SONG_ROW_MIN <= end - start <= SONG_ROW_MAX]
+        if not rows:
+            return np.asarray(image)
+        index = self._last_center.get("song_row", 0)
+        if selected is not None:
+            middle = (selected[0] + selected[1]) // 2
+            index = next((i for i, (start, end) in enumerate(rows) if start <= middle < end), index)
+        index = min(index, len(rows) - 1)
+        self._last_center["song_row"] = index
+        visible = (HEIGHT - HEADER_HEIGHT) // SONG_ROW_HEIGHT
+        first = max(0, min(index - visible // 2, len(rows) - visible))
+        left, right = zone["played"]
+        icons = window[top:top + height, left:right]
+        red = (icons[..., 0] > 170) & (icons[..., 1] < 70) & (icons[..., 2] < 70)
+        played_lines = red.sum(axis=1) >= PLAYED_RED_MIN_WIDTH
+
+        def band(start, end, x0, x1):
+            # La franja del texto, centrada en la fila (las filas de VirtualDJ miden ~40 px)
+            middle = top + (start + end) // 2
+            return Image.fromarray(np.ascontiguousarray(window[middle - TEXT_BAND // 2:middle + TEXT_BAND // 2, x0:x1]))
+
+        for slot, (start, end) in enumerate(rows[first:first + visible]):
+            y = HEADER_HEIGHT + slot * SONG_ROW_HEIGHT
+            background = tuple(int(c) for c in np.median(titles[start:end].reshape(-1, 3), axis=0))
+            draw.rectangle((0, y, WIDTH - 1, y + SONG_ROW_HEIGHT - 1), fill=background)
+            cover = Image.fromarray(np.ascontiguousarray(window[top + start:top + end, cover_x:title_x]))
+            cover_width = round(cover.width * SONG_ROW_HEIGHT / cover.height)
+            image.paste(cover.resize((cover_width, SONG_ROW_HEIGHT), Image.BILINEAR), (PLAYED_GUTTER, y))
+            text_x = PLAYED_GUTTER + cover_width + 6
+            bpm = band(start, end, bpm_x, bpm_end)
+            bpm_left = WIDTH - bpm.width
+            text_width = max(1, min(artist_x - title_x, bpm_left - text_x - 4))
+            image.paste(band(start, end, title_x, title_x + text_width), (text_x, y - 1))
+            image.paste(band(start, end, artist_x, artist_x + text_width), (text_x, y + SONG_ROW_HEIGHT - TEXT_BAND + 1))
+            image.paste(bpm, (bpm_left, y + (SONG_ROW_HEIGHT - TEXT_BAND) // 2))
+            if played_lines[start:end].any():
+                middle = y + SONG_ROW_HEIGHT / 2
+                draw.ellipse((PLAYED_GUTTER / 2 - 8, middle - 8, PLAYED_GUTTER / 2 + 8, middle + 8), fill=PLAYED)
+            if first + slot == index and selected is not None:
+                draw.rectangle((0, y, WIDTH - 1, y + SONG_ROW_HEIGHT - 1), outline=(255, 255, 255), width=2)
+        return np.asarray(image)
+
+    def _header(self, draw, name):
+        draw.rectangle((0, 0, WIDTH, HEADER_HEIGHT - 1), fill=(28, 28, 28))
+        draw.text((8, 3), self.layout[name]["title"], font=_font(16), fill=(235, 235, 235))
+        if "played" in self.layout[name]:
+            # Leyenda de la marca
+            draw.ellipse((WIDTH - 82, 7, WIDTH - 72, 17), fill=PLAYED)
+            draw.text((WIDTH - 66, 4), "pasado", font=_font(14), fill=(170, 170, 170))
 
     def _render(self, lines, row, name, played=()):
         image = Image.new("RGB", (WIDTH, HEIGHT))
         draw = ImageDraw.Draw(image)
-        draw.rectangle((0, 0, WIDTH, HEADER_HEIGHT - 1), fill=(28, 28, 28))
-        draw.text((8, 3), self.layout[name]["title"], font=_font(16), fill=(235, 235, 235))
+        self._header(draw, name)
         gutter = PLAYED_GUTTER if "played" in self.layout[name] else 0
-        if gutter:
-            # Leyenda de la marca
-            draw.ellipse((WIDTH - 82, 7, WIDTH - 72, 17), fill=PLAYED)
-            draw.text((WIDTH - 66, 4), "pasado", font=_font(14), fill=(170, 170, 170))
         if lines is None:
             draw.text((8, HEADER_HEIGHT + 10), "VirtualDJ no está a la vista", font=_font(16), fill=(140, 140, 140))
             return np.asarray(image)
