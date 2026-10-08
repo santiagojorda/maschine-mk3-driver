@@ -57,8 +57,44 @@ class ModeWatcher:
         self.browser = False  # en modo DJ, BROWSER prende y apaga la vista de carpetas y temas
         self._on_change = on_change
         self._on_message = on_message
-        self.port_name = find_input_port(port_hint)
-        self._port = mido.open_input(self.port_name, callback=self._handle)
+        self._port_hint = port_hint
+        self._port = None
+        self.port_name = None
+        self._last_check = 0.0
+        self.ensure_connected(force=True)
+
+    def ensure_connected(self, force=False, every_seconds=3.0):
+        """Si la Maschine se apagó o se desenchufó, su puerto MIDI desaparece (y al volver puede tener otro
+        nombre, "... MIDI 2"): se vuelve a buscar y abrir. Devuelve True si el puerto está abierto."""
+        now = time.perf_counter()
+        if not force and now - self._last_check < every_seconds:
+            return self._port is not None
+        self._last_check = now
+        try:
+            names = mido.get_input_names()
+        except Exception:
+            return self._port is not None
+        if self._port is not None and self.port_name in names:
+            return True
+        if self._port is not None:
+            print(f"Se perdió el puerto MIDI '{self.port_name}'; espero que vuelva la Maschine")
+            try:
+                self._port.close()
+            except Exception:
+                pass
+            self._port = None
+            self.port_name = None
+        candidates = [name for name in names if self._port_hint.lower() in name.lower()]
+        if not candidates:
+            return False
+        try:
+            self._port = mido.open_input(candidates[0], callback=self._handle)
+            self.port_name = candidates[0]
+            print(f"Puerto MIDI abierto: '{self.port_name}'")
+            return True
+        except Exception as error:
+            print(f"No se pudo abrir '{candidates[0]}': {error}")
+            return False
 
     @property
     def mode(self):
@@ -96,4 +132,5 @@ class ModeWatcher:
         return True
 
     def close(self):
-        self._port.close()
+        if self._port is not None:
+            self._port.close()

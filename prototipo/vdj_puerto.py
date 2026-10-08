@@ -11,8 +11,10 @@ de 8 bits que cortarían un sysex, así que se juntan acá de F0 a F7.
 Uso: python vdj_puerto.py   (si ya hay uno corriendo, este sale solo)
 """
 
+import atexit
 import ctypes
 import ctypes.wintypes as W
+import faulthandler
 import socket
 import sys
 import threading
@@ -41,6 +43,13 @@ class PortBridge:
             raise RuntimeError(f"No se pudo crear el puerto virtual '{PORT_NAME}' (¿está instalado loopMIDI / teVirtualMIDI?)")
 
     def _on_data(self, port, data, length, instance):
+        # Un error acá no puede cortar el programa (lo llama el driver)
+        try:
+            self._collect(data, length)
+        except Exception as error:
+            print(f"Error leyendo el puerto: {error!r}", flush=True)
+
+    def _collect(self, data, length):
         if not data or not length:
             return
         for byte in bytes(data[:length]):
@@ -75,6 +84,8 @@ class PortBridge:
 
 
 def main():
+    faulthandler.enable()  # si se cae por algo de bajo nivel, queda el motivo en el registro
+    atexit.register(lambda: print(time.strftime("%H:%M:%S"), "vdj_puerto.py terminó", flush=True))
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.bind(BRIDGE_ADDRESS)
@@ -86,7 +97,7 @@ def main():
     except Exception as error:
         print(error)
         return 1
-    print(f"Puerto '{PORT_NAME}' creado; datos por UDP a {DATA_PORT}", flush=True)
+    print(time.strftime("%H:%M:%S"), f"Puerto '{PORT_NAME}' creado; datos por UDP a {DATA_PORT}", flush=True)
     sock.settimeout(5.0)
     last_report = time.perf_counter()
     while True:
@@ -96,6 +107,9 @@ def main():
                 bridge.send_all()
         except (socket.timeout, ConnectionResetError):
             pass
+        except OSError as error:
+            print(f"UDP: {error!r}", flush=True)
+            time.sleep(1.0)
         if time.perf_counter() - last_report > 60:
             print(f"{bridge.messages} mensajes de VirtualDJ", flush=True)
             last_report = time.perf_counter()

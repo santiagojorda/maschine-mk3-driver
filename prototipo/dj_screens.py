@@ -20,6 +20,7 @@ Uso: python dj_screens.py [--config config.json] [--start dj]
 
 import argparse
 import json
+import socket
 import subprocess
 import sys
 import time
@@ -39,7 +40,7 @@ from dj_info import render_decks
 from encoder_view import dj_encoder
 from encoder_view import render_ableton as render_ableton_encoder
 from vdj_browser import BrowserView
-from vdj_data import VdjData
+from vdj_data import BRIDGE_ADDRESS, VdjData
 from window_capture import BackgroundWindowCapture
 
 STATS_EVERY_S = 5.0
@@ -94,6 +95,33 @@ def load_config(path):
     return config
 
 
+def vdj_port_running():
+    """vdj_puerto.py tiene tomado el puerto UDP de pedidos: si se puede tomar, no está corriendo."""
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.bind(BRIDGE_ADDRESS)
+        return False
+    except OSError:
+        return True
+    finally:
+        probe.close()
+
+
+class Throttled:
+    """Un mensaje que se repite (USB desconectado, por ejemplo) se imprime cuando cambia o cada 30 s."""
+
+    def __init__(self, every_seconds=30.0):
+        self._last = None
+        self._time = 0.0
+        self._every = every_seconds
+
+    def __call__(self, text):
+        now = time.perf_counter()
+        if text != self._last or now - self._time >= self._every:
+            print(text)
+            self._last, self._time = text, now
+
+
 def start_vdj_port():
     """Lanza vdj_puerto.py aparte, para que sobreviva a los reinicios del prototipo (si ya corre, sale solo)."""
     log = Path(__file__).resolve().parent.parent / ".venv" / "vdj_puerto.log"
@@ -120,6 +148,19 @@ def banner(text):
     position = ((WIDTH - (right - left)) // 2 - left, (HEIGHT - (bottom - top)) // 2 - top)
     draw.text(position, text, fill=(255, 255, 255), font=font)
     return image
+
+
+def banner_strip(text, height=HEIGHT):
+    """Aviso en gris, centrado, como array listo para mandar."""
+    image = Image.new("RGB", (WIDTH, height))
+    draw = ImageDraw.Draw(image)
+    try:
+        font = ImageFont.truetype("arialbd.ttf", 20)
+    except OSError:
+        font = ImageFont.load_default()
+    width = draw.textlength(text, font=font)
+    draw.text(((WIDTH - width) / 2, height / 2 - 12), text, fill=(150, 150, 150), font=font)
+    return np.asarray(image)
 
 
 def main():
@@ -166,10 +207,21 @@ def main():
     sent = [0, 0]
     stats_start = time.perf_counter()
     last_full_refresh = time.perf_counter()
+    last_port_check = time.perf_counter()
+    report = Throttled()
+    window_missing = banner_strip("Abrí VirtualDJ (ni cerrado ni minimizado)", screens[0]["height"])
 
     try:
         while True:
           try:
+              # Lo que se puede caer sin que el prototipo se entere: el puerto MIDI de la Maschine
+              # (al apagarla) y vdj_puerto.py (se vuelve a lanzar)
+              watcher.ensure_connected()
+              if time.perf_counter() - last_port_check >= 5.0:
+                  last_port_check = time.perf_counter()
+                  if not vdj_port_running():
+                      print("vdj_puerto.py no está corriendo: lo vuelvo a lanzar (después reiniciá VirtualDJ)")
+                      start_vdj_port()
               if watcher.sync(ableton_text.reported_mode()):
                   print("(modo tomado del script de Ableton)")
               new_mode = watcher.mode
@@ -290,14 +342,19 @@ def main():
                       continue
                   next_due[display] = now + 1.0 / screen["fps"]
                   try:
-                      rgb = capture.grab_stack(screen["regions"], screen["fit"], screen["height"])
+                      if display == 0 and hasattr(capture, "latest") and capture.latest() is None:
+                          rgb = window_missing  # VirtualDJ cerrado o minimizado: se avisa en vez de negro
+                      else:
+                          rgb = capture.grab_stack(screen["regions"], screen["fit"], screen["height"])
                       frame = rgb.tobytes()
                       if frame != last_sent[display]:
                           displays.send_rgb(display, rgb, 0, (HEIGHT - screen["height"]) // 2)
                           last_sent[display] = frame
                           sent[display] += 1
                   except Exception as error:  # un cuadro perdido no corta el prototipo
-                      print(f"Error en la pantalla {display}: {error}")
+                      report(f"Error en la pantalla {display}: {error}")
+                      if isinstance(error, RuntimeError):  # la Maschine no está: no tiene sentido seguir este ciclo
+                          raise
 
               elapsed = time.perf_counter() - stats_start
               if elapsed >= STATS_EVERY_S:
@@ -311,7 +368,7 @@ def main():
                   time.sleep(wait)
           except Exception as error:
               # Nada corta el prototipo: un error (por ejemplo, USB) se anota y se reintenta
-              print(f"Error en el ciclo: {error!r}; sigo en medio segundo")
+              report(f"Error en el ciclo: {error!r}; sigo en medio segundo")
               last_sent = [None, None]
               last_frame = [None, None]
               time.sleep(0.5)
