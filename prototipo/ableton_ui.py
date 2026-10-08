@@ -270,6 +270,9 @@ def render_session(state, display):
     tracks = session.get("tracks") or []
     ring_start = session.get("ring_column", 0)
     ring_end = ring_start + session.get("ring_tracks", COLUMNS)
+    # Números reales del set (empiezan en 1): track = columna, escena = fila
+    first_track = session.get("page_offset", session.get("track_offset", 0)) + 1
+    first_scene = session.get("scene_offset", 0) + 1
     row_height = (HEIGHT - TRACK_STRIP_HEIGHT) // SESSION_ROWS
     for column in range(COLUMNS):
         index = display * COLUMNS + column
@@ -280,12 +283,18 @@ def render_session(state, display):
             continue
         color = _dim(_track_rgb(track.get("color")), dim)
         draw.rectangle((x0 + 2, 0, x0 + COLUMN_WIDTH - 3, TRACK_STRIP_HEIGHT - 3), fill=color)
-        _centered(draw, track.get("name"), x0 + COLUMN_WIDTH // 2, 4, _font(14, True), _text_color_on(color))
+        label = f"{first_track + index} {track.get('name') or ''}"
+        _centered(draw, label, x0 + COLUMN_WIDTH // 2, 4, _font(14, True), _text_color_on(color))
         slots = track.get("slots") or []
         for row in range(SESSION_ROWS):
             top = TRACK_STRIP_HEIGHT + row * row_height
             box = (x0 + 2, top + 2, x0 + COLUMN_WIDTH - 3, top + row_height - 3)
             _draw_clip(draw, box, slots[row] if row < len(slots) else None, dim)
+
+    # Número de escena en la primera celda de cada fila de esta pantalla
+    for row in range(SESSION_ROWS):
+        top = TRACK_STRIP_HEIGHT + row * row_height
+        _draw_scene_badge(draw, COLUMN_WIDTH - 6, top + row_height - 24, f"E{first_scene + row}")
 
     _draw_pads_frame(draw, display, ring_start, ring_end)
 
@@ -295,6 +304,14 @@ def render_session(state, display):
     if 0 <= touched < len(knobs) and knobs[touched] and touched // COLUMNS != display:
         _draw_volume_popup(draw, knobs[touched])
     return image
+
+
+def _draw_scene_badge(draw, right, top, text):
+    """Recuadro chico con el número de escena, alineado a la derecha en (right, top)."""
+    font = _font(12, True)
+    width = draw.textlength(text, font=font) + 8
+    draw.rectangle((right - width, top, right, top + 17), fill=(0, 0, 0), outline=(110, 110, 110))
+    draw.text((right - width + 4, top + 1), text, font=font, fill=TEXT)
 
 
 def _draw_pads_frame(draw, display, ring_start, ring_end):
