@@ -21,6 +21,10 @@ SAMPLING_CC = 39
 MIXER_CC = 37
 PLUGIN_CC = 35
 BROWSER_CC = 38
+# En modo DJ, tocar algo de la mezcla cierra el browser y vuelve a la vista normal (canal 2):
+KNOB_TOUCH_CCS = range(10, 18)  # tocar una perilla (jogs, tempo, volumen, filtro)
+PAD_PAGE_CCS = range(81, 85)  # KEYBOARD, PAD MODE, CHORDS, STEP
+GROUP_CCS = range(100, 108)  # A-H: efectos y preescucha
 
 DEFAULT_PORT_HINT = "Maschine MK3 Ctrl MIDI"
 
@@ -47,6 +51,14 @@ def mode_for_message(message):
 def is_browser_press(message):
     return (message.type == "control_change" and message.channel == MODE_CHANNEL
             and message.control == BROWSER_CC and message.value > 0)
+
+
+def closes_browser(message):
+    if message.type == "pitchwheel":  # la tira táctil = crossfader
+        return True
+    return (message.type == "control_change" and message.channel == MODE_CHANNEL and message.value > 0
+            and (message.control in KNOB_TOUCH_CCS or message.control in PAD_PAGE_CCS
+                 or message.control in GROUP_CCS))
 
 
 class ModeWatcher:
@@ -107,6 +119,10 @@ class ModeWatcher:
         if is_browser_press(message):
             with self._lock:
                 self.browser = not self.browser
+            return
+        if self.browser and closes_browser(message):
+            with self._lock:
+                self.browser = False
             return
         new_mode = mode_for_message(message)
         if new_mode is None:

@@ -101,10 +101,13 @@ class MaschineDisplays:
         self._open()
 
     @classmethod
-    def wait_for_device(cls, retry_seconds=0.5):
-        """Espera a que la Maschine esté conectada (para arrancar antes de enchufarla)."""
+    def wait_for_device(cls, retry_seconds=0.5, on_wait=None):
+        """Espera a que la Maschine esté conectada (para arrancar antes de enchufarla).
+        on_wait se llama en cada intento (el pulso para supervisor.py)."""
         warned = False
         while True:
+            if on_wait:
+                on_wait()
             try:
                 return cls()
             except (RuntimeError, usb.core.USBError) as error:

@@ -33,6 +33,13 @@ user32.PrintWindow.argtypes = [W.HWND, W.HDC, W.UINT]
 user32.IsWindow.argtypes = [W.HWND]
 user32.IsIconic.argtypes = [W.HWND]
 user32.GetWindowRect.argtypes = [W.HWND, ctypes.POINTER(W.RECT)]
+user32.GetWindowThreadProcessId.argtypes = [W.HWND, ctypes.POINTER(W.DWORD)]
+kernel32 = ctypes.windll.kernel32
+kernel32.OpenProcess.argtypes = [W.DWORD, W.BOOL, W.DWORD]
+kernel32.OpenProcess.restype = W.HANDLE
+kernel32.GetProcessTimes.argtypes = [W.HANDLE] + [ctypes.POINTER(W.FILETIME)] * 4
+kernel32.CloseHandle.argtypes = [W.HANDLE]
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 gdi32.CreateCompatibleDC.argtypes = [W.HDC]
 gdi32.CreateCompatibleDC.restype = W.HDC
 gdi32.CreateCompatibleBitmap.argtypes = [W.HDC, ctypes.c_int, ctypes.c_int]
@@ -110,6 +117,29 @@ class WindowCapture:
             gdi32.DeleteDC(memory_dc)
             user32.ReleaseDC(hwnd, window_dc)
 
+    def process_started(self):
+        """Hora (time.time) en que arrancó el proceso de la ventana, o None si no está."""
+        hwnd = self._window()
+        if not hwnd:
+            return None
+        if getattr(self, "_started_hwnd", None) == hwnd:
+            return self._started
+        pid = W.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
+        if not handle:
+            return None
+        try:
+            times = [W.FILETIME() for _ in range(4)]
+            if not kernel32.GetProcessTimes(handle, *[ctypes.byref(t) for t in times]):
+                return None
+            created = (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+            # FILETIME: centenas de ns desde 1601
+            self._started_hwnd, self._started = hwnd, created / 1e7 - 11644473600
+            return self._started
+        finally:
+            kernel32.CloseHandle(handle)
+
     def close(self):
         pass
 
@@ -167,6 +197,9 @@ class BackgroundWindowCapture:
                 self._latest = image
                 self.captures += 1
             time.sleep(max(0.0, self._interval - (time.perf_counter() - start)))
+
+    def process_started(self):
+        return self._capture.process_started()
 
     def latest(self):
         """Última captura de toda la ventana (numpy RGB), o None."""

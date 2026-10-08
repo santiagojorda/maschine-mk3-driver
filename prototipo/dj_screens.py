@@ -95,6 +95,52 @@ def load_config(path):
     return config
 
 
+HEARTBEAT_FILE = Path(__file__).resolve().parent.parent / ".venv" / "dj_screens.heartbeat"
+MODE_FILE = Path(__file__).resolve().parent.parent / ".venv" / "ultimo_modo.txt"  # para volver al mismo modo tras un reinicio
+
+
+def saved_mode():
+    try:
+        mode = MODE_FILE.read_text(encoding="ascii").strip()
+    except OSError:
+        return ABLETON
+    return mode if mode in (DJ, ABLETON) else ABLETON
+
+
+class Heartbeat:
+    """Pulso para supervisor.py: escribe la hora en un archivo, como mucho una vez por segundo.
+    Si deja de cambiar, el programa está colgado y el supervisor lo reinicia."""
+
+    def __init__(self, path=HEARTBEAT_FILE):
+        self._path = path
+        self._last = 0.0
+
+    def __call__(self):
+        now = time.time()
+        if now - self._last < 1.0:
+            return
+        self._last = now
+        try:
+            self._path.write_text(f"{now:.0f}", encoding="ascii")
+        except OSError:
+            pass
+
+
+VDJ_SILENT_SECONDS = 4.0  # un deck sonando manda su posición todo el tiempo
+
+
+def vdj_link_warning(vdj_data, capture):
+    """Por qué los datos de VirtualDJ pueden estar viejos, o None si está todo bien."""
+    if vdj_data is None:
+        return "Sin puerto de datos de VirtualDJ"
+    # (VirtualDJ se reconecta solo si el puerto se vuelve a crear: alcanza con mirar si llegan datos)
+    with vdj_data.lock:
+        playing = any(deck.get("playing") for deck in vdj_data.decks)
+    if playing and time.time() - vdj_data.last_live > VDJ_SILENT_SECONDS:
+        return "VirtualDJ no manda datos: reinicialo"
+    return None
+
+
 def vdj_port_running():
     """vdj_puerto.py tiene tomado el puerto UDP de pedidos: si se puede tomar, no está corriendo."""
     probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -167,15 +213,20 @@ def banner_strip(text, height=HEIGHT):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=str(Path(__file__).with_name("config.json")))
-    parser.add_argument("--start", choices=[DJ, ABLETON], default=ABLETON, help="modo al arrancar")
+    parser.add_argument("--start", choices=[DJ, ABLETON], default=None,
+                        help="modo al arrancar (por defecto, el último que se usó)")
     parser.add_argument("--midi-log", action="store_true", help="imprimir todos los mensajes MIDI que llegan")
     args = parser.parse_args()
+    if args.start is None:
+        args.start = saved_mode()
 
     config = load_config(args.config)
     screens = [config["screens"][name] for name in SCREEN_NAMES]
 
     set_dpi_aware()
-    displays = MaschineDisplays.wait_for_device()
+    beat = Heartbeat()
+    beat()
+    displays = MaschineDisplays.wait_for_device(on_wait=beat)
     if config["capture_from"] == "window":
         capture = BackgroundWindowCapture(fps=max(screen["fps"] for screen in screens))
     else:
@@ -197,7 +248,8 @@ def main():
           f"Modo inicial: {args.start.upper()}. Ctrl+C para salir.")
 
     # Sin datos de Ableton (cerrado, o el script sin cargar): un cartel; nunca el último texto, que queda viejo
-    ableton_banner = Image.fromarray(banner_strip("Abrí Ableton (o recargá el script de la Maschine)"))
+    # Programa cerrado (o sin mandar datos): la izquierda dice solo su nombre y la derecha queda vacía
+    ableton_banner = banner("ABLETON")
     blank = Image.new("RGB", (WIDTH, HEIGHT))
     browser_view = BrowserView(config.get("browser"))
     mode = None
@@ -212,10 +264,13 @@ def main():
     last_full_refresh = time.perf_counter()
     last_port_check = time.perf_counter()
     report = Throttled()
-    window_missing = banner_strip("Abrí VirtualDJ (ni cerrado ni minimizado)", screens[0]["height"])
+    window_missing = np.asarray(banner("VIRTUAL DJ").crop((0, (HEIGHT - screens[0]["height"]) // 2, WIDTH,
+                                                         (HEIGHT + screens[0]["height"]) // 2)))
+    blank_rgb = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
 
     try:
         while True:
+          beat()
           try:
               # Lo que se puede caer sin que el prototipo se entere: el puerto MIDI de la Maschine
               # (al apagarla) y vdj_puerto.py (se vuelve a lanzar)
@@ -223,7 +278,7 @@ def main():
               if time.perf_counter() - last_port_check >= 5.0:
                   last_port_check = time.perf_counter()
                   if not vdj_port_running():
-                      print("vdj_puerto.py no está corriendo: lo vuelvo a lanzar (después reiniciá VirtualDJ)")
+                      print("vdj_puerto.py no está corriendo: lo vuelvo a lanzar (VirtualDJ se reconecta solo)")
                       start_vdj_port()
               if watcher.sync(ableton_text.reported_mode()):
                   print("(modo tomado del script de Ableton)")
@@ -235,6 +290,10 @@ def main():
               if new_mode != mode:
                   mode = new_mode
                   print(f"--> modo {mode.upper()}")
+                  try:
+                      MODE_FILE.write_text(mode, encoding="ascii")
+                  except OSError:
+                      pass
                   last_sent = [None, None]
                   last_frame = [None, None]
                   next_due = [0.0, 0.0]
@@ -312,8 +371,16 @@ def main():
                   continue
 
               now = time.perf_counter()
+              vdj_open = capture.process_started() is not None if hasattr(capture, "process_started") else True
               for display, screen in enumerate(screens):
                   if now < next_due[display]:
+                      continue
+                  if display == DECKS_DISPLAY and not vdj_open:
+                      # VirtualDJ cerrado: la derecha vacía, también en browser o VOLUME / SWING
+                      next_due[display] = now + 1.0 / DECKS_FPS
+                      if displays.send_changes(display, blank_rgb, last_frame[display]):
+                          sent[display] += 1
+                      last_frame[display] = blank_rgb
                       continue
                   encoder_image = dj_encoder(vdj_data) if display == ENCODER_DISPLAY else None
                   if encoder_image is not None:
@@ -342,7 +409,7 @@ def main():
                   if display == DECKS_DISPLAY:
                       next_due[display] = now + 1.0 / DECKS_FPS
                       try:
-                          rgb = np.asarray(render_decks(vdj_data))
+                          rgb = np.asarray(render_decks(vdj_data, vdj_link_warning(vdj_data, capture)))
                           if displays.send_changes(display, rgb, last_frame[display]):
                               sent[display] += 1
                           last_frame[display] = rgb

@@ -142,8 +142,19 @@ def _name_strip(draw, x0, label, color):
     _centered(draw, label, x0 + COLUMN_WIDTH // 2, top + 4, _font(15, True), _text_color_on(color))
 
 
-def render_decks(data):
-    """Imagen PIL de 480 x 272 con el estado de los dos decks (data: VdjData, o None si no hay datos)."""
+WARNING = (200, 30, 30)
+
+
+def _draw_warning(draw, text):
+    # Franja roja abajo, sobre los nombres de las perillas: los datos de arriba pueden estar viejos
+    top = HEIGHT - 30
+    draw.rectangle((0, top, WIDTH - 1, HEIGHT - 1), fill=WARNING)
+    _centered(draw, text, WIDTH // 2, top + 6, _font(15, True), (255, 255, 255), width=WIDTH - 12)
+
+
+def render_decks(data, warning=None):
+    """Imagen PIL de 480 x 272 con el estado de los dos decks (data: VdjData, o None si no hay datos).
+    warning: aviso en rojo (por ejemplo, VirtualDJ dejó de mandar datos)."""
     image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
     draw = ImageDraw.Draw(image)
     if data is None:
@@ -162,4 +173,6 @@ def render_decks(data):
             _draw_filter(draw, 2 + index, deck.get("filter"), f"FILTRO {index + 1}", DECK_COLORS[index])
         for index, deck in enumerate(decks):
             _draw_popup(draw, index, deck, now)
+    if warning:
+        _draw_warning(draw, warning)
     return image

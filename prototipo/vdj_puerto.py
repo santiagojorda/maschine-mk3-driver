@@ -21,7 +21,7 @@ import threading
 import time
 from pathlib import Path
 
-from vdj_data import BRIDGE_ADDRESS, DATA_PORT, REQUEST_ALL, SYSEX_ID
+from vdj_data import BRIDGE_ADDRESS, DATA_PORT, PORT_STARTED_FILE, REPLAY_MARK, REQUEST_ALL, SYSEX_ID
 
 PORT_NAME = "MK3 Screens"
 LOG_PATH = Path(__file__).resolve().parent.parent / ".venv" / "vdj_puerto.log"
@@ -82,7 +82,7 @@ class PortBridge:
         with self._lock:
             messages = list(self._last.values())
         for message in messages:
-            self._send(message)
+            self._send(bytes([REPLAY_MARK]) + message)
 
 
 def main():
@@ -103,6 +103,8 @@ def main():
         print(error)
         return 1
     print(time.strftime("%H:%M:%S"), f"Puerto '{PORT_NAME}' creado; datos por UDP a {DATA_PORT}", flush=True)
+    # Un VirtualDJ abierto antes de esta hora no está conectado a este puerto (dj_screens.py avisa)
+    PORT_STARTED_FILE.write_text(f"{time.time():.0f}", encoding="ascii")
     sock.settimeout(5.0)
     last_report = time.perf_counter()
     while True:

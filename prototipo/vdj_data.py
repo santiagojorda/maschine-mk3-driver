@@ -12,6 +12,7 @@ campo, así un prototipo recién arrancado pide todo y no espera a que algo camb
 
 import socket
 import threading
+from pathlib import Path
 import time
 import unicodedata
 
@@ -19,10 +20,21 @@ SYSEX_ID = 0x7D  # "uso no comercial / experimental"
 BRIDGE_ADDRESS = ("127.0.0.1", 9018)  # vdj_puerto.py: acá se le piden todos los valores
 DATA_PORT = 9019  # vdj_puerto.py manda acá cada sysex (sin F0 / F7)
 REQUEST_ALL = b"todo"
+REPLAY_MARK = 0x52  # "R": vdj_puerto.py reenvía un valor guardado (no es un dato nuevo de VirtualDJ)
+PORT_STARTED_FILE = Path(__file__).resolve().parent.parent / ".venv" / "vdj_puerto.started"
+
+
+def port_started():
+    """Hora (time.time) en que vdj_puerto.py creó el puerto, o None."""
+    try:
+        return float(PORT_STARTED_FILE.read_text(encoding="ascii"))
+    except (OSError, ValueError):
+        return None
 
 FIELDS = {
     1: "title", 2: "artist", 3: "bpm", 4: "bpm_original", 5: "playing", 6: "volume", 7: "filter",
     8: "sync", 9: "keylock", 10: "loop", 11: "loop_length", 12: "title_utf8", 13: "artist_utf8", 14: "loaded",
+    15: "position",
 }
 GLOBAL_FIELDS = {1: "encoder_mode", 2: "master_volume", 3: "headphone_volume"}  # campo 0x3_
 THOUSANDTHS = ("bpm", "bpm_original", "volume", "filter", "master_volume", "headphone_volume")
@@ -79,6 +91,7 @@ class VdjData:
         self.general = DeckState()  # encoder_mode ("0", "1" = VOLUME, "2" = SWING), master_volume, headphone_volume
         self.lock = threading.Lock()
         self.messages = 0
+        self.last_live = time.time()  # último dato nuevo de VirtualDJ (no reenviado por vdj_puerto.py)
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._socket.bind(("127.0.0.1", DATA_PORT))
         self._socket.settimeout(1.0)
@@ -110,6 +123,11 @@ class VdjData:
                 last_request = time.perf_counter()
 
     def _handle(self, message):
+        live = True
+        if message[:1] == bytes([REPLAY_MARK]):
+            live, message = False, message[1:]
+        if live:
+            self.last_live = time.time()
         if len(message) < 2 or message[0] != SYSEX_ID:
             return
         field = message[1]

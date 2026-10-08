@@ -1,11 +1,8 @@
 @echo off
 title Maschine MK3 Display Driver
 cd /d "%~dp0"
-echo Iniciando driver de pantallas Maschine MK3...
-echo Para salir, cerra esta ventana.
-:inicio
-.venv\Scripts\python prototipo\dj_screens.py
-echo.
-echo El programa se cerro; lo vuelvo a abrir en 3 segundos (cerra esta ventana para salir).
-timeout /t 3 /nobreak >nul
-goto inicio
+rem El supervisor prende el puerto de datos de VirtualDJ y las pantallas, y las reinicia si se caen o se cuelgan.
+rem Normalmente ya arranca solo con Windows (acceso directo en la carpeta Inicio); si ya corre, este avisa y sale.
+echo Pantallas Maschine MK3 - registro en .venv\pantallas.log. Para salir, cerra esta ventana.
+.venv\Scripts\python prototipo\supervisor.py
+pause

@@ -43,6 +43,8 @@ FIELDS = (
     (12, "TITLEU", 60, "deck {n} get_title", "utf8"),
     (13, "ARTISTU", 40, "deck {n} get_artist", "utf8"),
     (14, "LOADED", 1, "deck {n} loaded ? get_text '1' : get_text '0'"),
+    # Cambia todo el tiempo mientras el deck suena: es el pulso que dice que VirtualDJ sigue conectado
+    (15, "POS", 6, "deck {n} get_position & param_multiply 10000 & param_cast 'integer' & param_cast 'text' 6"),
 )
 
 # Campos generales, sin deck (campo = 0x30 + código). $encmode lo pone el mapeo de la Maschine:
