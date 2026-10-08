@@ -47,6 +47,9 @@ BROWSER_FPS = 12
 BROWSER_DISPLAY = 1  # derecha: la izquierda sigue con las ondas
 DECKS_DISPLAY = 1  # derecha, cuando no está el browser: estado de los decks
 DECKS_FPS = 15
+# Cada tanto se manda todo de nuevo, aunque no haya cambiado: si otro programa (el de NI al cambiar
+# de modo, por ejemplo) dibujó en las pantallas, como solo se manda lo que cambia, quedaría pisado
+FULL_REFRESH_SECONDS = 2.0
 
 
 class MeterSmoother:
@@ -159,6 +162,7 @@ def main():
     last_version = 0  # para contar cuántos estados de Ableton llegan entre estadísticas
     sent = [0, 0]
     stats_start = time.perf_counter()
+    last_full_refresh = time.perf_counter()
 
     try:
         while True:
@@ -166,6 +170,10 @@ def main():
               if watcher.sync(ableton_text.reported_mode()):
                   print("(modo tomado del script de Ableton)")
               new_mode = watcher.mode
+              if time.perf_counter() - last_full_refresh >= FULL_REFRESH_SECONDS:
+                  last_full_refresh = time.perf_counter()
+                  last_sent = [None, None]
+                  last_frame = [None, None]
               if new_mode != mode:
                   mode = new_mode
                   print(f"--> modo {mode.upper()}")
