@@ -270,9 +270,8 @@ def render_session(state, display):
     tracks = session.get("tracks") or []
     ring_start = session.get("ring_column", 0)
     ring_end = ring_start + session.get("ring_tracks", COLUMNS)
-    # Números reales del set (empiezan en 1): track = columna, escena = fila
+    # Número real del track en el set (empieza en 1)
     first_track = session.get("page_offset", session.get("track_offset", 0)) + 1
-    first_scene = session.get("scene_offset", 0) + 1
     row_height = (HEIGHT - TRACK_STRIP_HEIGHT) // SESSION_ROWS
     for column in range(COLUMNS):
         index = display * COLUMNS + column
@@ -301,27 +300,17 @@ def render_session(state, display):
                 font = _font(15, True)
                 draw.text((bx0 + 6, by0 + 3), _fit_text(draw, name, font, bx1 - bx0 - 12), font=font, fill=(0, 0, 0))
 
-    # Número de escena en la primera celda de cada fila de esta pantalla
-    for row in range(SESSION_ROWS):
-        top = TRACK_STRIP_HEIGHT + row * row_height
-        _draw_scene_badge(draw, COLUMN_WIDTH - 6, top + row_height - 24, f"E{first_scene + row}")
-
-    _draw_pads_frame(draw, display, ring_start, ring_end)
-
-    # Pop-up del volumen de la perilla que se toca, en la otra pantalla (no tapa la columna que se mira)
+    # Pop-up chico del volumen de la perilla que se toca: tapa las 2 celdas de abajo de su columna
     touched = state.get("touched", -1)
     knobs = state.get("knobs") or []
-    if 0 <= touched < len(knobs) and knobs[touched] and touched // COLUMNS != display:
-        _draw_volume_popup(draw, knobs[touched])
+    if 0 <= touched < len(knobs) and knobs[touched] and touched // COLUMNS == display:
+        x0 = (touched % COLUMNS) * COLUMN_WIDTH
+        top = TRACK_STRIP_HEIGHT + (SESSION_ROWS - 2) * row_height
+        _draw_volume_popup(draw, knobs[touched], (x0 + 2, top + 2, x0 + COLUMN_WIDTH - 3,
+                                                  TRACK_STRIP_HEIGHT + SESSION_ROWS * row_height - 3))
+
+    _draw_pads_frame(draw, display, ring_start, ring_end)
     return image
-
-
-def _draw_scene_badge(draw, right, top, text):
-    """Recuadro chico con el número de escena, alineado a la derecha en (right, top)."""
-    font = _font(12, True)
-    width = draw.textlength(text, font=font) + 8
-    draw.rectangle((right - width, top, right, top + 17), fill=(0, 0, 0), outline=(110, 110, 110))
-    draw.text((right - width + 4, top + 1), text, font=font, fill=TEXT)
 
 
 def _draw_pads_frame(draw, display, ring_start, ring_end):
@@ -343,24 +332,26 @@ def _draw_pads_frame(draw, display, ring_start, ring_end):
         draw.rectangle((right - width + 1, top, right, bottom), fill=PADS_FRAME)
 
 
-def _draw_volume_popup(draw, knob):
+def _draw_volume_popup(draw, knob, box):
+    """Volumen de un track en un recuadro chico (box): nombre, valor en dB, barra y medidor."""
+    left, top, right, bottom = box
     color = _track_rgb(knob.get("color"))
-    left, top, right, bottom = 40, 46, WIDTH - 40, HEIGHT - 46
-    draw.rectangle((left, top, right, bottom), fill=(18, 18, 18), outline=TEXT, width=2)
-    draw.rectangle((left + 2, top + 2, right - 2, top + 34), fill=color)
-    _centered(draw, knob.get("track") or knob.get("name"), WIDTH // 2, top + 8, _font(19, True),
-              _text_color_on(color), width=right - left - 16)
-    _centered(draw, knob.get("text"), WIDTH // 2, top + 44, _font(34, True), TEXT, width=right - left - 16)
+    center = (left + right) // 2
+    draw.rectangle(box, fill=(18, 18, 18), outline=TEXT, width=2)
+    draw.rectangle((left + 2, top + 2, right - 2, top + 24), fill=color)
+    _centered(draw, knob.get("track") or knob.get("name"), center, top + 5, _font(14, True),
+              _text_color_on(color), width=right - left - 10)
+    _centered(draw, knob.get("text"), center, top + 32, _font(22, True), TEXT, width=right - left - 10)
 
     # Barra de volumen con el medidor del track debajo
-    bar_left, bar_right, bar_top = left + 20, right - 20, bottom - 52
+    bar_left, bar_right, bar_top = left + 8, right - 8, bottom - 30
     value = max(0.0, min(1.0, knob.get("value", 0.0)))
-    draw.rectangle((bar_left, bar_top, bar_right, bar_top + 16), fill=GROOVE)
-    draw.rectangle((bar_left, bar_top, bar_left + value * (bar_right - bar_left), bar_top + 16), fill=_visible(color))
+    draw.rectangle((bar_left, bar_top, bar_right, bar_top + 12), fill=GROOVE)
+    draw.rectangle((bar_left, bar_top, bar_left + value * (bar_right - bar_left), bar_top + 12), fill=_visible(color))
     meter = max(0.0, min(1.0, knob.get("meter") or 0.0))
-    draw.rectangle((bar_left, bar_top + 24, bar_right, bar_top + 32), fill=(25, 25, 25))
+    draw.rectangle((bar_left, bar_top + 17, bar_right, bar_top + 23), fill=(25, 25, 25))
     if meter > 0:
-        draw.rectangle((bar_left, bar_top + 24, bar_left + meter * (bar_right - bar_left), bar_top + 32),
+        draw.rectangle((bar_left, bar_top + 17, bar_left + meter * (bar_right - bar_left), bar_top + 23),
                        fill=_meter_color(meter))
 
 
