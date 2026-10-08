@@ -1,4 +1,5 @@
-"""Vista del encoder grande con VOLUME o SWING, igual en Ableton y en VirtualDJ (pantalla derecha).
+"""Vista del encoder grande con VOLUME o SWING, igual en Ableton y en VirtualDJ (pantalla derecha);
+en Ableton también TEMPO (la barra va de 60 a 200 BPM).
 
 VOLUME = volumen master, SWING = volumen de auriculares (cue), en los dos programas:
 título arriba, el valor grande, un fader horizontal con una línea blanca en la
@@ -12,8 +13,9 @@ from maschine_display import HEIGHT, WIDTH
 
 VOLUME = "volume"
 SWING = "swing"
-TITLES = {VOLUME: "VOLUMEN MASTER", SWING: "AURICULARES"}
-COLORS = {VOLUME: (255, 150, 30), SWING: (0, 170, 230)}
+TEMPO = "tempo"
+TITLES = {VOLUME: "VOLUMEN MASTER", SWING: "AURICULARES", TEMPO: "TEMPO"}
+COLORS = {VOLUME: (255, 150, 30), SWING: (0, 170, 230), TEMPO: (170, 90, 230)}
 
 
 def render_encoder(mode, value, text, source, meter=None):
