@@ -434,13 +434,15 @@ def render_screen(state, display):
     draw = ImageDraw.Draw(image)
     view = state.get("view")
     track_color = _track_rgb(state.get("track_color"))
+    device_color = _track_rgb(state["device_color"]) if state.get("device_color") is not None else track_color
 
     if display == 0:
         if view == MIXER_VIEW:
             parameter = state.get("mixer_parameter")
             _header(draw, "MIXER", parameter)
         else:
-            _header(draw, state.get("device") or "Sin dispositivo", "FX")
+            # El color del dispositivo: el de su cadena si está en un rack, si no el del track
+            _header(draw, state.get("device") or "Sin dispositivo", "FX", color=device_color)
     else:
         _header(draw, state.get("track") or "", "LOCK" if state.get("locked") else None, color=track_color)
 
@@ -459,7 +461,7 @@ def render_screen(state, display):
                 _draw_knob(draw, column, knob, touched == index, _track_rgb(knob.get("color")),
                            knob.get("track") or knob.get("name"), knob.get("meter"))
         else:
-            _draw_knob(draw, column, knob, touched == index, track_color, knob.get("name"))
+            _draw_knob(draw, column, knob, touched == index, device_color, knob.get("name"))
         if column:
             x = column * COLUMN_WIDTH
             draw.line((x, HEADER_HEIGHT + 4, x, HEIGHT - 4), fill=(35, 35, 35))

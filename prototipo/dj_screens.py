@@ -196,7 +196,9 @@ def main():
     print(f"Escuchando '{watcher.port_name}' y el texto de Ableton en UDP {config['ableton_text_port']}. "
           f"Modo inicial: {args.start.upper()}. Ctrl+C para salir.")
 
-    ableton_banner = banner("ABLETON")
+    # Sin datos de Ableton (cerrado, o el script sin cargar): un cartel; nunca el último texto, que queda viejo
+    ableton_banner = Image.fromarray(banner_strip("Abrí Ableton (o recargá el script de la Maschine)"))
+    blank = Image.new("RGB", (WIDTH, HEIGHT))
     browser_view = BrowserView(config.get("browser"))
     mode = None
     showing_browser = False
@@ -254,7 +256,7 @@ def main():
 
               if mode != DJ:
                   frame_start = time.perf_counter()
-                  state = ableton_text.state()
+                  state = ableton_text.state(max_age=2.0)
                   # VOLUME / SWING: la pantalla derecha muestra el encoder, igual que en modo DJ
                   encoder = state.get("encoder") if state else None
                   graphics = wants_graphics(state)
@@ -280,15 +282,22 @@ def main():
                           last_frame[display] = None
                           continue
                       last_frame[display] = None
-                      content = ableton_text.screen_lines(display) if ableton_text.received else "banner"
+                      # El texto (vistas sin gráficos: clip, settings...) solo con datos frescos de Ableton
+                      content = ableton_text.screen_lines(display) if state is not None else f"banner{display}"
                       if content == last_sent[display]:
                           continue
-                      displays.send_image(display, ableton_banner if content == "banner" else render_screen(*content))
+                      if content == "banner0":
+                          image = ableton_banner
+                      elif content == "banner1":
+                          image = blank
+                      else:
+                          image = render_screen(*content)
+                      displays.send_image(display, image)
                       last_sent[display] = content
                   elapsed = time.perf_counter() - stats_start
                   if elapsed >= STATS_EVERY_S:
                       if state is None:
-                          print("Ableton: sin estado JSON (¿script recargado?); se muestra el texto")
+                          print("Ableton: sin estado JSON (¿cerrado o script sin recargar?); se muestra el cartel")
                       else:
                           print(f"Ableton: dibuja {screen_kind(state) or 'texto'}, vista {state.get('view')}, "
                                 f"session {state.get('session_view')}, encoder {state.get('encoder_mode')}, "
