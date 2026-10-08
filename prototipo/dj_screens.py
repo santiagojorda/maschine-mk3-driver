@@ -184,17 +184,47 @@ def start_vdj_port():
             continue
 
 
-def banner(text):
+PROJECT_NAME = "Maschine MK3 as Ableton Push"
+AUTHOR = "Santiago Jorda"
+
+
+def _truetype(name, size):
+    try:
+        return ImageFont.truetype(name, size)
+    except OSError:
+        return ImageFont.load_default()
+
+
+def banner(text, credit=True):
+    """Texto grande centrado; abajo, chico, el nombre del proyecto y el autor."""
     image = Image.new("RGB", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(image)
-    try:
-        font = ImageFont.truetype("arialbd.ttf", 56)
-    except OSError:
-        font = ImageFont.load_default()
+    font = _truetype("arialbd.ttf", 56)
     left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
     position = ((WIDTH - (right - left)) // 2 - left, (HEIGHT - (bottom - top)) // 2 - top)
     draw.text(position, text, fill=(255, 255, 255), font=font)
+    if credit:
+        small = _truetype("arial.ttf", 15)
+        line = f"{PROJECT_NAME}  ·  {AUTHOR}"
+        draw.text(((WIDTH - draw.textlength(line, font=small)) / 2, HEIGHT - 30), line, fill=(120, 120, 120),
+                  font=small)
     return image
+
+
+def splash():
+    """Pantallas de bienvenida: el nombre del proyecto a la izquierda y el autor a la derecha."""
+    left = Image.new("RGB", (WIDTH, HEIGHT))
+    draw = ImageDraw.Draw(left)
+    for text, size, y, color in (("MASCHINE MK3", 44, 70, (255, 255, 255)),
+                                 ("as Ableton Push", 30, 130, (255, 150, 30))):
+        font = _truetype("arialbd.ttf", size)
+        draw.text(((WIDTH - draw.textlength(text, font=font)) / 2, y), text, fill=color, font=font)
+    right = Image.new("RGB", (WIDTH, HEIGHT))
+    draw = ImageDraw.Draw(right)
+    for text, size, y, color in (("by", 22, 85, (140, 140, 140)), (AUTHOR, 40, 115, (255, 255, 255))):
+        font = _truetype("arialbd.ttf", size)
+        draw.text(((WIDTH - draw.textlength(text, font=font)) / 2, y), text, fill=color, font=font)
+    return left, right
 
 
 def banner_strip(text, height=HEIGHT):
@@ -227,6 +257,12 @@ def main():
     beat = Heartbeat()
     beat()
     displays = MaschineDisplays.wait_for_device(on_wait=beat)
+    try:
+        for display, image in enumerate(splash()):
+            displays.send_image(display, image)
+        time.sleep(2.0)
+    except Exception as error:  # la bienvenida no puede frenar el arranque
+        print(f"Bienvenida: {error!r}")
     if config["capture_from"] == "window":
         capture = BackgroundWindowCapture(fps=max(screen["fps"] for screen in screens))
     else:
@@ -264,7 +300,7 @@ def main():
     last_full_refresh = time.perf_counter()
     last_port_check = time.perf_counter()
     report = Throttled()
-    window_missing = np.asarray(banner("VIRTUAL DJ").crop((0, (HEIGHT - screens[0]["height"]) // 2, WIDTH,
+    window_missing = np.asarray(banner("VIRTUAL DJ", credit=screens[0]["height"] == HEIGHT).crop((0, (HEIGHT - screens[0]["height"]) // 2, WIDTH,
                                                          (HEIGHT + screens[0]["height"]) // 2)))
     blank_rgb = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
 
