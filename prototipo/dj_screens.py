@@ -123,15 +123,16 @@ class Throttled:
 
 
 def start_vdj_port():
-    """Lanza vdj_puerto.py aparte, para que sobreviva a los reinicios del prototipo (si ya corre, sale solo)."""
-    log = Path(__file__).resolve().parent.parent / ".venv" / "vdj_puerto.log"
-    flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    """Lanza vdj_puerto.py aparte y sin ventana (pythonw), para que sobreviva a los reinicios del
+    prototipo (si ya corre, sale solo). Su registro queda en .venv/vdj_puerto.log."""
+    pythonw = Path(sys.executable).with_name("pythonw.exe")
+    executable = str(pythonw if pythonw.exists() else sys.executable)
+    flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
     for extra in (0x01000000, 0):  # CREATE_BREAKAWAY_FROM_JOB, si el job lo permite
         try:
-            with open(log, "a", encoding="utf-8") as output:
-                subprocess.Popen([sys.executable, "-u", str(Path(__file__).with_name("vdj_puerto.py"))],
-                                 cwd=str(Path(__file__).parent), stdout=output, stderr=output,
-                                 stdin=subprocess.DEVNULL, creationflags=flags | extra, close_fds=True)
+            subprocess.Popen([executable, "-u", str(Path(__file__).with_name("vdj_puerto.py"))],
+                             cwd=str(Path(__file__).parent), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, creationflags=flags | extra, close_fds=True)
             return
         except OSError:
             continue

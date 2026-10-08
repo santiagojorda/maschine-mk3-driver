@@ -19,10 +19,12 @@ import socket
 import sys
 import threading
 import time
+from pathlib import Path
 
 from vdj_data import BRIDGE_ADDRESS, DATA_PORT, REQUEST_ALL, SYSEX_ID
 
 PORT_NAME = "MK3 Screens"
+LOG_PATH = Path(__file__).resolve().parent.parent / ".venv" / "vdj_puerto.log"
 
 _MIDI_DATA_CALLBACK = ctypes.WINFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_ubyte), W.DWORD, ctypes.c_void_p)
 
@@ -84,7 +86,10 @@ class PortBridge:
 
 
 def main():
-    faulthandler.enable()  # si se cae por algo de bajo nivel, queda el motivo en el registro
+    # Corre sin ventana (pythonw, ver dj_screens.start_vdj_port): todo lo que imprime va al registro
+    log = open(LOG_PATH, "a", encoding="utf-8", buffering=1)
+    sys.stdout = sys.stderr = log
+    faulthandler.enable(log)  # si se cae por algo de bajo nivel, queda el motivo en el registro
     atexit.register(lambda: print(time.strftime("%H:%M:%S"), "vdj_puerto.py terminó", flush=True))
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
