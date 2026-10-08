@@ -2,7 +2,8 @@
 
 Modo DJ (SAMPLING): cada pantalla muestra en vivo las zonas de VirtualDJ de
 config.json, apiladas de arriba a abajo y con su propia velocidad. BROWSER prende
-y apaga, en la pantalla derecha, la lista de carpetas o temas que tiene el foco (vdj_browser.py). Con
+y apaga, en la pantalla derecha, la lista de carpetas o temas que tiene el foco (vdj_browser.py);
+si no, la derecha muestra el estado de los decks con los datos de VirtualDJ (dj_info.py, vdj_data.py). Con
 "capture_from": "window" (por defecto) se captura la ventana de VirtualDJ en
 sí, aunque esté tapada (no minimizada), y las zonas van en coordenadas de la
 ventana; con "screen", lo que se ve en el monitor. Modo Ableton
@@ -32,7 +33,9 @@ from ableton_ui import screen_kind, wants_graphics
 from maschine_display import HEIGHT, WIDTH, MaschineDisplays
 from mode import ABLETON, DJ, ModeWatcher
 from screen_capture import RegionCapture, set_dpi_aware
+from dj_info import render_decks
 from vdj_browser import BrowserView
+from vdj_data import VdjData
 from window_capture import BackgroundWindowCapture
 
 STATS_EVERY_S = 5.0
@@ -40,6 +43,8 @@ SCREEN_NAMES = ("left", "right")
 ABLETON_FPS = 30
 BROWSER_FPS = 12
 BROWSER_DISPLAY = 1  # derecha: la izquierda sigue con las ondas
+DECKS_DISPLAY = 1  # derecha, cuando no está el browser: estado de los decks
+DECKS_FPS = 15
 
 
 class MeterSmoother:
@@ -116,6 +121,12 @@ def main():
         on_message=(lambda message: print(f"MIDI {message}")) if args.midi_log else None,
     )
     ableton_text = AbletonText(config["ableton_text_port"])
+    try:
+        vdj_data = VdjData()
+        print("Puerto 'MK3 Screens' creado: VirtualDJ manda ahí el estado de los decks")
+    except Exception as error:
+        vdj_data = None
+        print(f"Sin datos de VirtualDJ: {error}")
     print(f"Escuchando '{watcher.port_name}' y el texto de Ableton en UDP {config['ableton_text_port']}. "
           f"Modo inicial: {args.start.upper()}. Ctrl+C para salir.")
 
@@ -219,6 +230,17 @@ def main():
                           print(f"Error en el browser: {error!r}")
                           last_frame[display] = None
                       continue
+                  if display == DECKS_DISPLAY:
+                      next_due[display] = now + 1.0 / DECKS_FPS
+                      try:
+                          rgb = np.asarray(render_decks(vdj_data))
+                          if displays.send_changes(display, rgb, last_frame[display]):
+                              sent[display] += 1
+                          last_frame[display] = rgb
+                      except Exception as error:
+                          print(f"Error en los decks: {error!r}")
+                          last_frame[display] = None
+                      continue
                   next_due[display] = now + 1.0 / screen["fps"]
                   try:
                       rgb = capture.grab_stack(screen["regions"], screen["fit"], screen["height"])
@@ -250,6 +272,8 @@ def main():
     finally:
         watcher.close()
         ableton_text.close()
+        if vdj_data is not None:
+            vdj_data.close()
         capture.close()
         try:
             displays.clear()
