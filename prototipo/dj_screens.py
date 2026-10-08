@@ -2,7 +2,7 @@
 
 Modo DJ (SAMPLING): cada pantalla muestra en vivo las zonas de VirtualDJ de
 config.json, apiladas de arriba a abajo y con su propia velocidad. BROWSER prende
-y apaga la vista de carpetas (izquierda) y temas (derecha) (vdj_browser.py). Con
+y apaga, en la pantalla derecha, la lista de carpetas o temas que tiene el foco (vdj_browser.py). Con
 "capture_from": "window" (por defecto) se captura la ventana de VirtualDJ en
 sí, aunque esté tapada (no minimizada), y las zonas van en coordenadas de la
 ventana; con "screen", lo que se ve en el monitor. Modo Ableton
@@ -39,7 +39,7 @@ STATS_EVERY_S = 5.0
 SCREEN_NAMES = ("left", "right")
 ABLETON_FPS = 30
 BROWSER_FPS = 12
-BROWSER_LISTS = ("folders", "songs")  # pantalla izquierda, derecha
+BROWSER_DISPLAY = 1  # derecha: la izquierda sigue con las ondas
 
 
 class MeterSmoother:
@@ -159,17 +159,6 @@ def main():
                   if mode == DJ and not browser:
                       displays.clear()
 
-              if browser:
-                  frame_start = time.perf_counter()
-                  window = capture.latest() if hasattr(capture, "latest") else None
-                  for display, name in enumerate(BROWSER_LISTS):
-                      rgb = browser_view.render(window, name)
-                      if displays.send_changes(display, rgb, last_frame[display]):
-                          sent[display] += 1
-                      last_frame[display] = rgb
-                  time.sleep(max(0.0, 1.0 / BROWSER_FPS - (time.perf_counter() - frame_start)))
-                  continue
-
               if mode != DJ:
                   frame_start = time.perf_counter()
                   state = ableton_text.state()
@@ -214,6 +203,21 @@ def main():
               now = time.perf_counter()
               for display, screen in enumerate(screens):
                   if now < next_due[display]:
+                      continue
+                  if browser and display == BROWSER_DISPLAY:
+                      next_due[display] = now + 1.0 / BROWSER_FPS
+                      try:
+                          window = capture.latest() if hasattr(capture, "latest") else None
+                          focus = browser_view.focus
+                          rgb = browser_view.render_focused(window)
+                          if browser_view.focus != focus:
+                              print(f"--> browser: {browser_view.focus}")
+                          if displays.send_changes(display, rgb, last_frame[display]):
+                              sent[display] += 1
+                          last_frame[display] = rgb
+                      except Exception as error:
+                          print(f"Error en el browser: {error!r}")
+                          last_frame[display] = None
                       continue
                   next_due[display] = now + 1.0 / screen["fps"]
                   try:

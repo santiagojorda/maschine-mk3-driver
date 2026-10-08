@@ -1,9 +1,11 @@
-"""Vista browser del modo DJ: carpetas en la pantalla izquierda y temas en la derecha.
+"""Vista browser del modo DJ, en la pantalla derecha: la lista de VirtualDJ que tiene el foco
+(carpetas o temas; apretar el encoder la cambia).
 
 Recorta las listas de la captura de la ventana de VirtualDJ (zonas en config.json,
 "browser") y muestra solo las filas alrededor de la seleccionada, a un tamaño que se
 lee. La fila seleccionada se reconoce por su fondo más claro: VirtualDJ pinta las filas
-alternando dos grises oscuros y la seleccionada, bastante más clara.
+alternando dos grises oscuros y la seleccionada, más clara; en la lista con el foco,
+todavía más clara (76 contra 58), así se sabe cuál mostrar.
 """
 
 import numpy as np
@@ -36,9 +38,10 @@ def _font(size):
 
 
 def _selected_row(lines):
-    """(arriba, abajo) de la fila seleccionada, en líneas de la lista, o None si no se ve."""
+    """(arriba, abajo, brillo) de la fila seleccionada, en líneas de la lista, o None si no se ve."""
     gray = lines.mean(axis=2)
-    bright = np.median(gray, axis=1) >= SELECTED_MIN_BRIGHTNESS
+    medians = np.median(gray, axis=1)
+    bright = medians >= SELECTED_MIN_BRIGHTNESS
     best, start = None, None
     for y, on in enumerate(np.append(bright, False)):
         if on and start is None:
@@ -47,30 +50,45 @@ def _selected_row(lines):
             if y - start >= SELECTED_MIN_LINES and (best is None or y - start > best[1] - best[0]):
                 best = (start, y)
             start = None
-    return best
+    if best is None:
+        return None
+    return best[0], best[1], float(np.median(medians[best[0]:best[1]]))
 
 
 class BrowserView:
     def __init__(self, layout=None):
         self.layout = layout or DEFAULT_LAYOUT
+        self.focus = "songs"
         self._last_center = {}  # si no se ve la selección (por ejemplo, al scrollear) se queda donde estaba
 
-    def render(self, window, name):
-        """Imagen RGB (numpy) de 480 x 272 con la lista name ("folders" o "songs")."""
+    def _lines(self, window, name):
         zone = self.layout[name]
+        top, height = zone["top"], zone["height"]
+        return np.concatenate([window[top:top + height, left:right] for left, right in zone["columns"]], axis=1)
+
+    def render_focused(self, window):
+        """Imagen RGB (numpy) de 480 x 272 con la lista que tiene el foco en VirtualDJ."""
+        if window is None:
+            return self._render(None, None, self.focus)
+        lists = {name: self._lines(window, name) for name in self.layout}
+        rows = {name: _selected_row(lines) if lines.size else None for name, lines in lists.items()}
+        if all(rows.values()):
+            # La selección de la lista con el foco es la más clara; si quedan parecidas, no cambia
+            folders, songs = rows["folders"][2], rows["songs"][2]
+            if abs(folders - songs) >= 8:
+                self.focus = "folders" if folders > songs else "songs"
+        return self._render(lists[self.focus], rows[self.focus], self.focus)
+
+    def _render(self, lines, row, name):
         image = Image.new("RGB", (WIDTH, HEIGHT))
         draw = ImageDraw.Draw(image)
         draw.rectangle((0, 0, WIDTH, HEADER_HEIGHT - 1), fill=(28, 28, 28))
-        draw.text((8, 3), zone["title"], font=_font(16), fill=(235, 235, 235))
-        if window is None:
+        draw.text((8, 3), self.layout[name]["title"], font=_font(16), fill=(235, 235, 235))
+        if lines is None:
             draw.text((8, HEADER_HEIGHT + 10), "VirtualDJ no está a la vista", font=_font(16), fill=(140, 140, 140))
             return np.asarray(image)
-
-        top, height = zone["top"], zone["height"]
-        lines = np.concatenate([window[top:top + height, left:right] for left, right in zone["columns"]], axis=1)
         if not lines.size:
             return np.asarray(image)
-        row = _selected_row(lines)
         center = self._last_center.get(name, 0) if row is None else (row[0] + row[1]) // 2
         self._last_center[name] = center
 
