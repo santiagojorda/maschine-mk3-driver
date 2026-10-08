@@ -289,7 +289,17 @@ def render_session(state, display):
         for row in range(SESSION_ROWS):
             top = TRACK_STRIP_HEIGHT + row * row_height
             box = (x0 + 2, top + 2, x0 + COLUMN_WIDTH - 3, top + row_height - 3)
-            _draw_clip(draw, box, slots[row] if row < len(slots) else None, dim)
+            slot = slots[row] if row < len(slots) else None
+            _draw_clip(draw, box, slot, dim)
+            if slot and slot.get("selected"):
+                # El clip seleccionado en Live, como un cursor: borde blanco grueso y el nombre invertido
+                # (franja blanca, letras negras); se distingue sobre cualquier color
+                bx0, by0, bx1, by1 = box
+                draw.rectangle((bx0 - 2, by0 - 2, bx1 + 2, by1 + 2), outline=TEXT, width=4)
+                draw.rectangle((bx0, by0, bx1, by0 + 22), fill=TEXT)
+                name = "vacío" if slot.get("empty") else (slot.get("name") or "")
+                font = _font(15, True)
+                draw.text((bx0 + 6, by0 + 3), _fit_text(draw, name, font, bx1 - bx0 - 12), font=font, fill=(0, 0, 0))
 
     # Número de escena en la primera celda de cada fila de esta pantalla
     for row in range(SESSION_ROWS):
