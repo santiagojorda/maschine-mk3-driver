@@ -9,6 +9,7 @@ programas lo usen a la vez.
 """
 
 import threading
+import time
 
 import mido
 
@@ -46,6 +47,7 @@ class ModeWatcher:
     def __init__(self, port_hint=DEFAULT_PORT_HINT, start_mode=ABLETON, on_change=None, on_message=None):
         self._lock = threading.Lock()
         self._mode = start_mode
+        self.last_button_time = 0.0  # perf_counter del último SAMPLING / MIXER / PLUGIN
         self._on_change = on_change
         self._on_message = on_message
         self.port_name = find_input_port(port_hint)
@@ -65,8 +67,21 @@ class ModeWatcher:
         with self._lock:
             changed = new_mode != self._mode
             self._mode = new_mode
+            self.last_button_time = time.perf_counter()
         if changed and self._on_change:
             self._on_change(new_mode)
+
+    def sync(self, reported_mode, quiet_seconds=1.0):
+        """Toma el modo que informa el script de Ableton (al arrancar, o si se desincronizaron),
+        salvo justo después de un botón: el script puede tardar un instante en enterarse."""
+        with self._lock:
+            if (reported_mode is None or reported_mode == self._mode
+                    or time.perf_counter() - self.last_button_time < quiet_seconds):
+                return False
+            self._mode = reported_mode
+        if self._on_change:
+            self._on_change(reported_mode)
+        return True
 
     def close(self):
         self._port.close()

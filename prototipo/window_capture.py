@@ -114,12 +114,12 @@ class WindowCapture:
         pass
 
 
-def stack_regions(window, regions, fit):
-    """Recorta zonas de una captura de la ventana y las apila de arriba a abajo en 480x272."""
-    canvas = Image.new("RGB", (WIDTH, HEIGHT))
+def stack_regions(window, regions, fit, height=HEIGHT):
+    """Recorta zonas de una captura de la ventana y las apila de arriba a abajo en 480 x height."""
+    canvas = Image.new("RGB", (WIDTH, height))
     if not regions or window is None:
         return np.asarray(canvas)
-    slot = HEIGHT // len(regions)
+    slot = height // len(regions)
     for index, region in enumerate(regions):
         left, top = region["left"], region["top"]
         crop = window[top:top + region["height"], left:left + region["width"]]
@@ -168,10 +168,10 @@ class BackgroundWindowCapture:
                 self.captures += 1
             time.sleep(max(0.0, self._interval - (time.perf_counter() - start)))
 
-    def grab_stack(self, regions, fit):
+    def grab_stack(self, regions, fit, height=HEIGHT):
         with self._lock:
             window = self._latest
-        return stack_regions(window, regions, fit)
+        return stack_regions(window, regions, fit, height)
 
     def close(self):
         self._running = False

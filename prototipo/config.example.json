@@ -5,7 +5,12 @@
       "fit": "stretch",
       "fps": 15,
       "regions": [
-        { "left": 600, "top": 44, "width": 720, "height": 170 }
+        {
+          "left": 600,
+          "top": 44,
+          "width": 720,
+          "height": 170
+        }
       ]
     },
     "right": {

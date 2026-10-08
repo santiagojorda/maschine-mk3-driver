@@ -7,10 +7,16 @@ F0 00 00 66 17 12 <posición> <caracteres...> F7, con posición = línea x 28.
 Son 4 líneas de 28 caracteres: las líneas 0 y 2 van en la pantalla izquierda,
 la 1 y la 3 en la derecha (arriba y abajo). La línea de abajo trae los valores
 de las 4 perillas de esa pantalla, separados por "|".
+
+Por el mismo puerto llega, 10 veces por segundo, un estado en JSON (empieza
+con "{"): la vista, las 8 perillas con su parámetro y, en el mixer, el color y
+el nivel de cada track. ableton_ui.py lo dibuja con faders y knobs.
 """
 
+import json
 import socket
 import threading
+import time
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -37,6 +43,10 @@ class AbletonText:
         self._lock = threading.Lock()
         self._chars = [" "] * (LINES * LINE_LENGTH)
         self._received = False
+        self._state = None
+        self._state_time = 0.0
+        self.state_version = 0
+        self._reported = (None, 0.0)
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._socket.bind(("127.0.0.1", port))
         self._socket.settimeout(0.5)
@@ -47,16 +57,35 @@ class AbletonText:
     def _listen(self):
         while self._running:
             try:
-                data = self._socket.recv(512)
+                # El estado JSON pesa más de 1 KB: con un búfer chico Windows descarta el paquete (WSAEMSGSIZE)
+                data = self._socket.recv(65535)
             except socket.timeout:
                 continue
-            except OSError:  # en Windows un UDP puede devolver ConnectionResetError: se ignora
+            except OSError as error:  # en Windows un UDP puede devolver ConnectionResetError: se ignora
                 if not self._running:
                     return
+                if getattr(error, "winerror", None) != 10054:
+                    print(f"UDP de Ableton: {error}")
                 continue
             self._apply(data)
 
     def _apply(self, data):
+        if data[:1] == b"{":
+            try:
+                state = json.loads(data)
+            except ValueError:
+                return
+            with self._lock:
+                now = time.perf_counter()
+                if state.get("type") == "mode":
+                    # En modo VirtualDJ el script solo avisa el modo
+                    self._reported = ("dj" if state.get("vdj") else "ableton", now)
+                    return
+                self._reported = ("ableton", now)
+                self._state = state
+                self._state_time = now
+                self.state_version += 1
+            return
         if not data.startswith(MCU_DISPLAY_HEADER) or len(data) < 8:
             return
         position = data[6]
@@ -73,6 +102,19 @@ class AbletonText:
     def received(self):
         with self._lock:
             return self._received
+
+    def reported_mode(self, max_age=1.0):
+        """El modo en que está el script de Ableton ("dj" o "ableton"), o None si no avisó hace poco."""
+        with self._lock:
+            mode, when = self._reported
+            return mode if mode and time.perf_counter() - when <= max_age else None
+
+    def state(self, max_age=1.0):
+        """El último estado JSON, o None si no llegó o es viejo (el script dejó de mandarlo)."""
+        with self._lock:
+            if self._state is None or time.perf_counter() - self._state_time > max_age:
+                return None
+            return self._state
 
     def lines(self):
         with self._lock:

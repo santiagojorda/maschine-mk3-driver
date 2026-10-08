@@ -51,12 +51,12 @@ class RegionCapture:
     def grab(self, region, fit):
         return np.asarray(fit_image(self._grab_image(region), fit))
 
-    def grab_stack(self, regions, fit):
-        """Captura varias zonas y las apila de arriba a abajo, cada una en una franja igual."""
-        canvas = Image.new("RGB", (WIDTH, HEIGHT))
+    def grab_stack(self, regions, fit, height=HEIGHT):
+        """Captura varias zonas y las apila de arriba a abajo (480 x height), cada una en una franja igual."""
+        canvas = Image.new("RGB", (WIDTH, height))
         if not regions:  # sin zonas: pantalla en negro
             return np.asarray(canvas)
-        slot = HEIGHT // len(regions)
+        slot = height // len(regions)
         for index, region in enumerate(regions):
             canvas.paste(fit_image(self._grab_image(region), fit, WIDTH, slot), (0, index * slot))
         return np.asarray(canvas)
