@@ -339,7 +339,7 @@ def _draw_pads_frame(draw, display, ring_start, ring_end):
 
 
 def _draw_volume_popup(draw, knob, box):
-    """Volumen de un track en un recuadro chico (box): nombre, valor en dB, barra y medidor."""
+    """Volumen de un track en un recuadro chico (box): nombre, valor en dB, fader vertical y medidor."""
     left, top, right, bottom = box
     color = _track_rgb(knob.get("color"))
     center = (left + right) // 2
@@ -347,22 +347,21 @@ def _draw_volume_popup(draw, knob, box):
     draw.rectangle((left + 2, top + 2, right - 2, top + 24), fill=color)
     _centered(draw, knob.get("track") or knob.get("name"), center, top + 5, _font(14, True),
               _text_color_on(color), width=right - left - 10)
-    _centered(draw, knob.get("text"), center, top + 32, _font(22, True), TEXT, width=right - left - 10)
-
-    # Fader horizontal: canal con el relleno del color del track, una línea blanca en la posición
-    # y el medidor del track debajo
-    bar_left, bar_right, groove_y = left + 10, right - 10, bottom - 30
+    # El valor arriba; debajo, el fader vertical (relleno del color del track y una línea blanca en la
+    # posición) con el medidor al lado
+    _centered(draw, knob.get("text"), center, top + 28, _font(17, True), TEXT, width=right - left - 8)
+    fader_x, meter_x = center - 8, center + 16
+    fader_top, fader_bottom = top + 54, bottom - 8
     value = max(0.0, min(1.0, knob.get("value", 0.0)))
-    position = bar_left + value * (bar_right - bar_left)
-    draw.rectangle((bar_left, groove_y - 3, bar_right, groove_y + 3), fill=GROOVE)
-    if position > bar_left:
-        draw.rectangle((bar_left, groove_y - 3, position, groove_y + 3), fill=_visible(color))
-    draw.rectangle((position - 2, groove_y - 10, position + 2, groove_y + 10), fill=TOUCHED)
+    position = fader_bottom - value * (fader_bottom - fader_top)
+    draw.rectangle((fader_x - 3, fader_top, fader_x + 3, fader_bottom), fill=GROOVE)
+    if position < fader_bottom:
+        draw.rectangle((fader_x - 3, position, fader_x + 3, fader_bottom), fill=_visible(color))
+    draw.rectangle((fader_x - 12, position - 2, fader_x + 12, position + 2), fill=TOUCHED)
     meter = max(0.0, min(1.0, knob.get("meter") or 0.0))
-    meter_top = groove_y + 15
-    draw.rectangle((bar_left, meter_top, bar_right, meter_top + 6), fill=(25, 25, 25))
+    draw.rectangle((meter_x - 3, fader_top, meter_x + 3, fader_bottom), fill=(25, 25, 25))
     if meter > 0:
-        draw.rectangle((bar_left, meter_top, bar_left + meter * (bar_right - bar_left), meter_top + 6),
+        draw.rectangle((meter_x - 3, fader_bottom - meter * (fader_bottom - fader_top), meter_x + 3, fader_bottom),
                        fill=_meter_color(meter))
 
 
