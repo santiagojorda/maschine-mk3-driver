@@ -223,6 +223,8 @@ SESSION_ROWS = 4
 TRACK_STRIP_HEIGHT = 26
 EMPTY_SLOT = (30, 30, 30)
 PLAYING = (60, 220, 90)
+PADS_FRAME = (0, 230, 80)  # marco de las columnas que están en los pads
+PADS_FRAME_WIDTH = 4
 RECORDING = (230, 50, 40)
 BLINK_SECONDS = 0.25
 
@@ -255,7 +257,8 @@ def _draw_clip(draw, box, slot, dim):
     name = _fit_text(draw, slot.get("name") or "", font, x1 - left - 4)
     draw.text((left, y0 + 5), name, font=font, fill=text_color)
     if slot.get("playing") or slot.get("recording"):
-        draw.rectangle(box, outline=PLAYING if slot.get("playing") else RECORDING, width=3)
+        # Blanco y no verde: el verde marca la zona de los pads
+        draw.rectangle(box, outline=TEXT if slot.get("playing") else RECORDING, width=3)
 
 
 def render_session(state, display):
@@ -284,12 +287,33 @@ def render_session(state, display):
             box = (x0 + 2, top + 2, x0 + COLUMN_WIDTH - 3, top + row_height - 3)
             _draw_clip(draw, box, slots[row] if row < len(slots) else None, dim)
 
+    _draw_pads_frame(draw, display, ring_start, ring_end)
+
     # Pop-up del volumen de la perilla que se toca, en la otra pantalla (no tapa la columna que se mira)
     touched = state.get("touched", -1)
     knobs = state.get("knobs") or []
     if 0 <= touched < len(knobs) and knobs[touched] and touched // COLUMNS != display:
         _draw_volume_popup(draw, knobs[touched])
     return image
+
+
+def _draw_pads_frame(draw, display, ring_start, ring_end):
+    """Marco verde alrededor de las columnas que están en los pads. Si siguen en la otra pantalla,
+    ese lado queda abierto, así el marco se lee como uno solo entre las dos."""
+    first_on_screen = display * COLUMNS
+    first = max(ring_start, first_on_screen)
+    last = min(ring_end, first_on_screen + COLUMNS) - 1
+    if first > last:
+        return
+    left = (first - first_on_screen) * COLUMN_WIDTH
+    right = (last - first_on_screen + 1) * COLUMN_WIDTH - 1
+    top, bottom, width = 0, HEIGHT - 1, PADS_FRAME_WIDTH
+    draw.rectangle((left, top, right, top + width - 1), fill=PADS_FRAME)
+    draw.rectangle((left, bottom - width + 1, right, bottom), fill=PADS_FRAME)
+    if first == ring_start:
+        draw.rectangle((left, top, left + width - 1, bottom), fill=PADS_FRAME)
+    if last == ring_end - 1:
+        draw.rectangle((right - width + 1, top, right, bottom), fill=PADS_FRAME)
 
 
 def _draw_volume_popup(draw, knob):
