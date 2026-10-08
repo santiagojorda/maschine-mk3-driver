@@ -148,13 +148,18 @@ class BrowserView:
         cover_x, title_x, artist_x = separators[0] + 1, separators[1], separators[2]
         bpm_x, bpm_end = separators[4], separators[5]
         titles = window[top:top + height, title_x:artist_x]
-        rows = [(start, end) for start, end in _row_bounds(titles) if SONG_ROW_MIN <= end - start <= SONG_ROW_MAX]
+        # Las filas se separan por el fondo en una franja sin texto (a la izquierda de la duración, que va
+        # alineada a la derecha): en la columna del título, un nombre largo tapa el fondo y partía la fila
+        strip = window[top:top + height, separators[3] + 2:separators[3] + 14]
+        rows = [(start, end) for start, end in _row_bounds(strip) if SONG_ROW_MIN <= end - start <= SONG_ROW_MAX]
         if not rows:
             return np.asarray(image)
+        brightness = [float(np.median(strip[start:end].mean(axis=2))) for start, end in rows]
         index = self._last_center.get("song_row", 0)
+        selected_rows = [i for i, value in enumerate(brightness) if value >= SELECTED_MIN_BRIGHTNESS]
+        selected = selected_rows[0] if selected_rows else None
         if selected is not None:
-            middle = (selected[0] + selected[1]) // 2
-            index = next((i for i, (start, end) in enumerate(rows) if start <= middle < end), index)
+            index = selected
         index = min(index, len(rows) - 1)
         self._last_center["song_row"] = index
         visible = (HEIGHT - HEADER_HEIGHT) // SONG_ROW_HEIGHT
@@ -171,7 +176,7 @@ class BrowserView:
 
         for slot, (start, end) in enumerate(rows[first:first + visible]):
             y = HEADER_HEIGHT + slot * SONG_ROW_HEIGHT
-            background = tuple(int(c) for c in np.median(titles[start:end].reshape(-1, 3), axis=0))
+            background = tuple(int(c) for c in np.median(strip[start:end].reshape(-1, 3), axis=0))
             draw.rectangle((0, y, WIDTH - 1, y + SONG_ROW_HEIGHT - 1), fill=background)
             cover = Image.fromarray(np.ascontiguousarray(window[top + start:top + end, cover_x:title_x]))
             cover_width = round(cover.width * SONG_ROW_HEIGHT / cover.height)
@@ -186,7 +191,7 @@ class BrowserView:
             if played_lines[start:end].any():
                 middle = y + SONG_ROW_HEIGHT / 2
                 draw.ellipse((PLAYED_GUTTER / 2 - 8, middle - 8, PLAYED_GUTTER / 2 + 8, middle + 8), fill=PLAYED)
-            if first + slot == index and selected is not None:
+            if first + slot == selected:
                 draw.rectangle((0, y, WIDTH - 1, y + SONG_ROW_HEIGHT - 1), outline=(255, 255, 255), width=2)
         return np.asarray(image)
 
