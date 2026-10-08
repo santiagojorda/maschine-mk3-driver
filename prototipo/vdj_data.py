@@ -33,13 +33,13 @@ def port_started():
 
 FIELDS = {
     1: "title", 2: "artist", 3: "bpm", 4: "bpm_original", 5: "playing", 6: "volume", 7: "filter",
-    8: "sync", 9: "keylock", 10: "loop", 11: "loop_length", 12: "title_utf8", 13: "artist_utf8", 14: "loaded",
+    8: "sync", 9: "pitch_lock", 10: "loop", 11: "loop_length", 12: "title_utf8", 13: "artist_utf8", 14: "loaded",
     15: "position",
 }
 GLOBAL_FIELDS = {1: "encoder_mode", 2: "master_volume", 3: "headphone_volume"}  # campo 0x3_
 THOUSANDTHS = ("bpm", "bpm_original", "volume", "filter", "master_volume", "headphone_volume")
 LOOP_LENGTHS = tuple(2.0 ** power for power in range(-5, 7))  # 1/32 ... 64 beats
-FLAGS = ("playing", "keylock", "loop", "loaded")
+FLAGS = ("playing", "pitch_lock", "loop", "loaded")
 
 def _parse_loop(text):
     """Largo del loop en beats, al valor de la lista más cercano: VirtualDJ lo da como "4", "0.5" o "1/2"

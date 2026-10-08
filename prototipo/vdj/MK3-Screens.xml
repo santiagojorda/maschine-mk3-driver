@@ -12,7 +12,7 @@
   <text sysex="F07D162020202020F7" offset="3" size="5" encoding="ascii" scroll="false" name="D1_VOL" deck="1" />
   <text sysex="F07D172020202020F7" offset="3" size="5" encoding="ascii" scroll="false" name="D1_FILTER" deck="1" />
   <text sysex="F07D1820F7" offset="3" size="1" encoding="ascii" scroll="false" name="D1_SYNC" deck="1" />
-  <text sysex="F07D1920F7" offset="3" size="1" encoding="ascii" scroll="false" name="D1_KEYLOCK" deck="1" />
+  <text sysex="F07D1920F7" offset="3" size="1" encoding="ascii" scroll="false" name="D1_PITCHLOCK" deck="1" />
   <text sysex="F07D1A20F7" offset="3" size="1" encoding="ascii" scroll="false" name="D1_LOOP" deck="1" />
   <text sysex="F07D1B20202020202020202020F7" offset="3" size="10" encoding="ascii" scroll="false" name="D1_LOOPLEN" deck="1" />
   <text sysex="F07D1C202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020F7" offset="3" size="60" encoding="utf8" scroll="false" name="D1_TITLEU" deck="1" />
@@ -27,7 +27,7 @@
   <text sysex="F07D262020202020F7" offset="3" size="5" encoding="ascii" scroll="false" name="D2_VOL" deck="2" />
   <text sysex="F07D272020202020F7" offset="3" size="5" encoding="ascii" scroll="false" name="D2_FILTER" deck="2" />
   <text sysex="F07D2820F7" offset="3" size="1" encoding="ascii" scroll="false" name="D2_SYNC" deck="2" />
-  <text sysex="F07D2920F7" offset="3" size="1" encoding="ascii" scroll="false" name="D2_KEYLOCK" deck="2" />
+  <text sysex="F07D2920F7" offset="3" size="1" encoding="ascii" scroll="false" name="D2_PITCHLOCK" deck="2" />
   <text sysex="F07D2A20F7" offset="3" size="1" encoding="ascii" scroll="false" name="D2_LOOP" deck="2" />
   <text sysex="F07D2B20202020202020202020F7" offset="3" size="10" encoding="ascii" scroll="false" name="D2_LOOPLEN" deck="2" />
   <text sysex="F07D2C202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020F7" offset="3" size="60" encoding="utf8" scroll="false" name="D2_TITLEU" deck="2" />

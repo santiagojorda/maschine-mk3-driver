@@ -6,6 +6,7 @@ las perillas 5-8: volumen deck 1, volumen deck 2, filtro deck 1, filtro deck 2.
 Cuando cambia el loop, el sync o el pitch lock de un deck, un pop-up en su panel lo muestra.
 """
 
+import math
 import time
 
 from PIL import Image, ImageDraw
@@ -19,7 +20,7 @@ PANEL_WIDTH = WIDTH // 2
 PANEL_HEIGHT = 146
 STRIP_HEIGHT = 24
 POPUP_SECONDS = 1.3
-POPUP_FIELDS = ("loop_length", "loop", "sync", "keylock")
+POPUP_FIELDS = ("loop_length", "loop", "sync", "pitch_lock")
 CHIP_OFF = (45, 45, 45)
 CHIP_GREEN = (40, 190, 80)
 CHIP_ORANGE = (240, 140, 20)
@@ -78,7 +79,7 @@ def _draw_panel(draw, index, deck):
 
     sync = deck.get("sync")
     x = _chip(draw, x0 + 8, 112, _sync_text(sync), CHIP_GREEN if sync == "S" else CHIP_ORANGE if sync == "M" else CHIP_OFF)
-    x = _chip(draw, x, 112, "P.LOCK", CHIP_ORANGE if deck.get("keylock") else CHIP_OFF)
+    x = _chip(draw, x, 112, "P.LOCK", CHIP_ORANGE if deck.get("pitch_lock") else CHIP_OFF)
     _chip(draw, x, 112, f"LOOP {_loop_text(deck.get('loop_length'))}", CHIP_GREEN if deck.get("loop") else CHIP_OFF)
 
 
@@ -89,7 +90,7 @@ def _popup_text(field, deck):
         return "LOOP", _loop_text(deck.get("loop_length")) if deck.get("loop") else "OFF"
     if field == "sync":
         return "SYNC", _sync_text(deck.get("sync"))
-    return "PITCH LOCK", "ON" if deck.get("keylock") else "OFF"
+    return "PITCH LOCK", "ON" if deck.get("pitch_lock") else "OFF"
 
 
 def _draw_popup(draw, index, deck, now):
@@ -123,16 +124,24 @@ def _draw_volume(draw, column, value, label, color):
 
 
 def _draw_filter(draw, column, value, label, color):
+    """Perilla redonda bipolar, como en Ableton: el arco sale del centro (filtro apagado)
+    hacia la izquierda (pasa bajos) o la derecha (pasa altos)."""
     x0 = column * COLUMN_WIDTH
-    center = x0 + COLUMN_WIDTH // 2
-    _centered(draw, _filter_text(value), center, PANEL_HEIGHT + 4, _font(16, True), TEXT)
-    left, right, y = x0 + 14, x0 + COLUMN_WIDTH - 14, (PANEL_HEIGHT + 28 + HEIGHT - 34) // 2
-    draw.rectangle((left, y - 3, right, y + 3), fill=GROOVE)
+    center_x = x0 + COLUMN_WIDTH // 2
+    _centered(draw, _filter_text(value), center_x, PANEL_HEIGHT + 4, _font(16, True), TEXT)
+    center_y, radius, width = (PANEL_HEIGHT + 28 + HEIGHT - 34) // 2 + 4, 30, 8
+    box = (center_x - radius, center_y - radius, center_x + radius, center_y + radius)
+    start, end = 135, 405  # 270 grados con el hueco abajo (PIL mide en sentido horario desde las 3)
+    draw.arc(box, start, end, fill=GROOVE, width=width)
     if value is not None:
-        position = left + max(0.0, min(1.0, value)) * (right - left)
-        middle = (left + right) / 2
-        draw.rectangle((min(middle, position), y - 5, max(middle, position), y + 5), fill=color)
-        draw.rectangle((position - 2, y - 13, position + 2, y + 13), fill=TEXT)
+        angle = start + max(0.0, min(1.0, value)) * (end - start)
+        middle = (start + end) / 2
+        if abs(angle - middle) > 0.5:
+            draw.arc(box, min(middle, angle), max(middle, angle), fill=color, width=width)
+        rad = math.radians(angle)
+        inner, outer = radius * 0.2, radius * 0.75
+        draw.line((center_x + inner * math.cos(rad), center_y + inner * math.sin(rad),
+                   center_x + outer * math.cos(rad), center_y + outer * math.sin(rad)), fill=TEXT, width=4)
     _name_strip(draw, x0, label, color)
 
 

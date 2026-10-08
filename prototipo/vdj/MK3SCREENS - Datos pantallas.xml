@@ -8,7 +8,7 @@
   <map value="D1_VOL" action="deck 1 volume &amp; param_multiply 1000 &amp; param_cast 'integer' &amp; param_cast 'text' 5" />
   <map value="D1_FILTER" action="deck 1 filter &amp; param_multiply 1000 &amp; param_cast 'integer' &amp; param_cast 'text' 5" />
   <map value="D1_SYNC" action="deck 1 masterdeck ? get_text 'M' : ((deck 1 match_bpm ? true : (deck 1 is_sync ? true : false)) ? get_text 'S' : get_text '0')" />
-  <map value="D1_KEYLOCK" action="deck 1 key_lock ? get_text '1' : get_text '0'" />
+  <map value="D1_PITCHLOCK" action="deck 1 pitch_lock ? get_text '1' : get_text '0'" />
   <map value="D1_LOOP" action="deck 1 loop ? get_text '1' : get_text '0'" />
   <map value="D1_LOOPLEN" action="deck 1 get_loop &amp; param_cast 'text' 10" />
   <map value="D1_TITLEU" action="deck 1 get_title" />
@@ -23,7 +23,7 @@
   <map value="D2_VOL" action="deck 2 volume &amp; param_multiply 1000 &amp; param_cast 'integer' &amp; param_cast 'text' 5" />
   <map value="D2_FILTER" action="deck 2 filter &amp; param_multiply 1000 &amp; param_cast 'integer' &amp; param_cast 'text' 5" />
   <map value="D2_SYNC" action="deck 2 masterdeck ? get_text 'M' : ((deck 2 match_bpm ? true : (deck 2 is_sync ? true : false)) ? get_text 'S' : get_text '0')" />
-  <map value="D2_KEYLOCK" action="deck 2 key_lock ? get_text '1' : get_text '0'" />
+  <map value="D2_PITCHLOCK" action="deck 2 pitch_lock ? get_text '1' : get_text '0'" />
   <map value="D2_LOOP" action="deck 2 loop ? get_text '1' : get_text '0'" />
   <map value="D2_LOOPLEN" action="deck 2 get_loop &amp; param_cast 'text' 10" />
   <map value="D2_TITLEU" action="deck 2 get_title" />

@@ -36,7 +36,8 @@ FIELDS = (
     (6, "VOL", 5, "deck {n} volume & param_multiply 1000 & param_cast 'integer' & param_cast 'text' 5"),
     (7, "FILTER", 5, "deck {n} filter & param_multiply 1000 & param_cast 'integer' & param_cast 'text' 5"),
     (8, "SYNC", 1, _SYNC),
-    (9, "KEYLOCK", 1, "deck {n} key_lock ? get_text '1' : get_text '0'"),
+    # El candado de VirtualDJ (pitch_lock), el del pad PITCH LOCK. No key_lock: el mapeo lo prende siempre
+    (9, "PITCHLOCK", 1, "deck {n} pitch_lock ? get_text '1' : get_text '0'"),
     (10, "LOOP", 1, "deck {n} loop ? get_text '1' : get_text '0'"),
     # get_loop no se deja multiplicar: va el texto tal cual ("4", "0.5" o "1/2")
     (11, "LOOPLEN", 10, "deck {n} get_loop & param_cast 'text' 10"),
