@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .venv/
 prototipo/config.json
+build/
+dist/
+*.spec
+prototipo/icono.ico

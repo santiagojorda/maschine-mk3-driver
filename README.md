@@ -8,6 +8,21 @@ Native Instruments y usar las pantallas a gusto. Funciona con el mapeo de
 - [PLAN.md](PLAN.md): el driver completo (Go, Windows primero, después Push 3 standalone).
 - [PROTOTIPO-HOY.md](PROTOTIPO-HOY.md): el prototipo de pantallas de VirtualDJ.
 
+## Ejecutable
+
+`construir_exe.bat` arma `dist\MaschineMK3AsPush\MaschineMK3AsPush.exe` (una carpeta con el programa y todo lo que
+necesita; no hace falta tener Python para usarlo, solo para armarlo).
+
+| Comando | Qué hace |
+|---|---|
+| `MaschineMK3AsPush.exe` | Arranca las pantallas y el puerto de datos de VirtualDJ, sin ventana, y las reinicia si se caen o se cuelgan. Si ya está corriendo, avisa |
+| `MaschineMK3AsPush.exe --salir` | Lo detiene todo |
+| `MaschineMK3AsPush.exe --instalar-vdj` | Instala en VirtualDJ el dispositivo de datos (reiniciar VirtualDJ después) |
+
+El registro (`pantallas.log`), la configuración (`config.json`) y el estado quedan en
+`%LOCALAPPDATA%\MaschineMK3AsPush\`. Para que arranque con Windows, poner un acceso directo al .exe en
+`shell:startup`.
+
 ## Estado
 
 Prototipo en Python (`prototipo/`), **funcionando** (2026-10-07): en modo DJ
