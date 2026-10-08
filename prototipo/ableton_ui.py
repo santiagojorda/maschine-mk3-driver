@@ -17,6 +17,7 @@ from maschine_display import HEIGHT, WIDTH
 
 MIXER_VIEW = "default"
 DEVICE_VIEW = "device"
+BROWSER_VIEW = "browser"
 GRAPHIC_VIEWS = (MIXER_VIEW, DEVICE_VIEW)
 # Modos del encoder grande que tapan la pantalla con su valor (VOLUME, SWING, TEMPO, escala): ahí va texto.
 # Los demás (mixer "default", dispositivo "device", posición...) dejan ver los gráficos.
@@ -52,7 +53,7 @@ def _font(size, bold=False):
 
 
 def screen_kind(state):
-    """Qué dibujar: "session" (grilla de clips), "controls" (faders / knobs) o None (texto)."""
+    """Qué dibujar: "session" (grilla de clips), "browser", "controls" (faders / knobs) o None (texto)."""
     if state is None:
         return None
     # ARRANGER prende la vista session: se ve la grilla hasta apretar otro botón de vista
@@ -60,6 +61,8 @@ def screen_kind(state):
         return "session"
     if state.get("encoder_mode") in TEXT_ENCODER_MODES:
         return None
+    if state.get("view") == BROWSER_VIEW and state.get("browser"):
+        return "browser"
     if state.get("view") in GRAPHIC_VIEWS:
         return "controls"
     return None
@@ -363,10 +366,70 @@ def _draw_volume_popup(draw, knob, box):
                        fill=_meter_color(meter))
 
 
+BROWSER_ROW_HEIGHT = 30
+BROWSER_ROWS = (HEIGHT - HEADER_HEIGHT) // BROWSER_ROW_HEIGHT
+FOLDER_ICON = (230, 180, 60)
+
+
+def _draw_browser_list(draw, listing):
+    """Filas de una carpeta del browser con la seleccionada en el medio: franja blanca y letras negras."""
+    items = listing.get("items") or []
+    first, selected = listing.get("first", 0), listing.get("selected", 0)
+    top_index = max(0, min(selected - BROWSER_ROWS // 2, listing.get("count", 0) - BROWSER_ROWS))
+    font = _font(17, True)
+    for row in range(BROWSER_ROWS):
+        index = top_index + row
+        if not 0 <= index - first < len(items):
+            continue
+        item = items[index - first]
+        y0 = HEADER_HEIGHT + row * BROWSER_ROW_HEIGHT
+        y1 = y0 + BROWSER_ROW_HEIGHT - 1
+        is_selected = index == selected
+        if is_selected:
+            draw.rectangle((0, y0, WIDTH - 1, y1), fill=TEXT)
+        elif row % 2:
+            draw.rectangle((0, y0, WIDTH - 1, y1), fill=(22, 22, 22))
+        text_color = (0, 0, 0) if is_selected else TEXT
+        x = 10
+        if item.get("folder"):
+            # Carpetita
+            draw.rectangle((x, y0 + 10, x + 7, y0 + 13), fill=FOLDER_ICON)
+            draw.rectangle((x, y0 + 12, x + 17, y0 + 23), fill=FOLDER_ICON)
+            x += 26
+        draw.text((x, y0 + 5), _fit_text(draw, item.get("name"), font, WIDTH - x - 10), font=font, fill=text_color)
+
+
+def render_browser(state, display):
+    """Browser de Live: a la izquierda la carpeta de arriba (dónde estás), a la derecha lo que hay adentro."""
+    image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
+    draw = ImageDraw.Draw(image)
+    browser = state["browser"]
+    path = browser.get("path") or []
+    if display == 0:
+        parent = browser.get("parent")
+        if parent is None:
+            _header(draw, "BROWSER", "PREVIEW" if browser.get("preview") else None)
+            draw.text((10, HEADER_HEIGHT + 12), "Elegí una categoría", font=_font(17, True), fill=DIM_TEXT)
+            return image
+        title = parent.get("name") if len(path) <= 1 else path[-2]
+        _header(draw, "BROWSER" if len(path) <= 1 else title, "PREVIEW" if browser.get("preview") else None)
+        _draw_browser_list(draw, parent)
+    else:
+        listing = browser.get("list") or {}
+        count = listing.get("count", 0)
+        position = f"{listing.get('selected', 0) + 1}/{count}" if count else "vacía"
+        _header(draw, " > ".join(path) if path else "BROWSER", position)
+        _draw_browser_list(draw, listing)
+    return image
+
+
 def render_screen(state, display):
     """Imagen PIL de una pantalla (0 = izquierda, 1 = derecha): grilla de session, mixer o dispositivo."""
-    if screen_kind(state) == "session":
+    kind = screen_kind(state)
+    if kind == "session":
         return render_session(state, display)
+    if kind == "browser":
+        return render_browser(state, display)
     image = Image.new("RGB", (WIDTH, HEIGHT), BACKGROUND)
     draw = ImageDraw.Draw(image)
     view = state.get("view")
