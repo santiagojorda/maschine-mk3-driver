@@ -19,9 +19,9 @@ MIXER_VIEW = "default"
 DEVICE_VIEW = "device"
 BROWSER_VIEW = "browser"
 GRAPHIC_VIEWS = (MIXER_VIEW, DEVICE_VIEW)
-# Modos del encoder grande que tapan la pantalla con su valor (VOLUME, SWING, TEMPO, escala): ahí va texto.
-# Los demás (mixer "default", dispositivo "device", posición...) dejan ver los gráficos.
-TEXT_ENCODER_MODES = ("volume", "swing", "tempo", "scale")
+# Modos del encoder grande que tapan la pantalla con su valor (TEMPO, escala): ahí va texto.
+# VOLUME y SWING se dibujan en la pantalla derecha (encoder_view.py); los demás dejan ver los gráficos.
+TEXT_ENCODER_MODES = ("tempo", "scale")
 
 COLUMNS = 4
 COLUMN_WIDTH = WIDTH // COLUMNS

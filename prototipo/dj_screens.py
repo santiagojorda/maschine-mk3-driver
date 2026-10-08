@@ -36,6 +36,8 @@ from maschine_display import HEIGHT, WIDTH, MaschineDisplays
 from mode import ABLETON, DJ, ModeWatcher
 from screen_capture import RegionCapture, set_dpi_aware
 from dj_info import render_decks
+from encoder_view import dj_encoder
+from encoder_view import render_ableton as render_ableton_encoder
 from vdj_browser import BrowserView
 from vdj_data import VdjData
 from window_capture import BackgroundWindowCapture
@@ -47,6 +49,7 @@ BROWSER_FPS = 12
 BROWSER_DISPLAY = 1  # derecha: la izquierda sigue con las ondas
 DECKS_DISPLAY = 1  # derecha, cuando no está el browser: estado de los decks
 DECKS_FPS = 15
+ENCODER_DISPLAY = 1  # VOLUME / SWING, en los dos modos
 # Cada tanto se manda todo de nuevo, aunque no haya cambiado: si otro programa (el de NI al cambiar
 # de modo, por ejemplo) dibujó en las pantallas, como solo se manda lo que cambia, quedaría pisado
 FULL_REFRESH_SECONDS = 2.0
@@ -199,27 +202,36 @@ def main():
               if mode != DJ:
                   frame_start = time.perf_counter()
                   state = ableton_text.state()
-                  if wants_graphics(state):
-                      # Session, mixer o dispositivo: solo se manda lo que cambió
+                  # VOLUME / SWING: la pantalla derecha muestra el encoder, igual que en modo DJ
+                  encoder = state.get("encoder") if state else None
+                  graphics = wants_graphics(state)
+                  smoothed = meters.apply(state) if graphics else None
+                  for display in range(2):
                       try:
-                          smoothed = meters.apply(state)
-                          for display in range(2):
-                              rgb = np.asarray(render_ui_screen(smoothed, display))
+                          if display == ENCODER_DISPLAY and encoder:
+                              image = render_ableton_encoder(encoder)
+                          elif graphics:
+                              # Session, mixer o dispositivo: solo se manda lo que cambió
+                              image = render_ui_screen(smoothed, display)
+                          else:
+                              image = None
+                          if image is not None:
+                              rgb = np.asarray(image)
                               if displays.send_changes(display, rgb, last_frame[display]):
                                   sent[display] += 1
                               last_frame[display] = rgb
+                              last_sent[display] = None
+                              continue
                       except Exception as error:  # un cuadro perdido no frena la pantalla
                           print(f"Error dibujando Ableton: {error!r}")
-                          last_frame = [None, None]
-                      last_sent = [None, None]
-                  else:
-                      last_frame = [None, None]
-                      for display in range(2):
-                          content = ableton_text.screen_lines(display) if ableton_text.received else "banner"
-                          if content == last_sent[display]:
-                              continue
-                          displays.send_image(display, ableton_banner if content == "banner" else render_screen(*content))
-                          last_sent[display] = content
+                          last_frame[display] = None
+                          continue
+                      last_frame[display] = None
+                      content = ableton_text.screen_lines(display) if ableton_text.received else "banner"
+                      if content == last_sent[display]:
+                          continue
+                      displays.send_image(display, ableton_banner if content == "banner" else render_screen(*content))
+                      last_sent[display] = content
                   elapsed = time.perf_counter() - stats_start
                   if elapsed >= STATS_EVERY_S:
                       if state is None:
@@ -240,6 +252,15 @@ def main():
               now = time.perf_counter()
               for display, screen in enumerate(screens):
                   if now < next_due[display]:
+                      continue
+                  encoder_image = dj_encoder(vdj_data) if display == ENCODER_DISPLAY else None
+                  if encoder_image is not None:
+                      # VOLUME / SWING: la misma vista que en Ableton
+                      next_due[display] = now + 1.0 / DECKS_FPS
+                      rgb = np.asarray(encoder_image)
+                      if displays.send_changes(display, rgb, last_frame[display]):
+                          sent[display] += 1
+                      last_frame[display] = rgb
                       continue
                   if browser and display == BROWSER_DISPLAY:
                       next_due[display] = now + 1.0 / BROWSER_FPS

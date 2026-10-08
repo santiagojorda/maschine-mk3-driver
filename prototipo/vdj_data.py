@@ -24,7 +24,8 @@ FIELDS = {
     1: "title", 2: "artist", 3: "bpm", 4: "bpm_original", 5: "playing", 6: "volume", 7: "filter",
     8: "sync", 9: "keylock", 10: "loop", 11: "loop_length", 12: "title_utf8", 13: "artist_utf8", 14: "loaded",
 }
-THOUSANDTHS = ("bpm", "bpm_original", "volume", "filter")
+GLOBAL_FIELDS = {1: "encoder_mode", 2: "master_volume", 3: "headphone_volume"}  # campo 0x3_
+THOUSANDTHS = ("bpm", "bpm_original", "volume", "filter", "master_volume", "headphone_volume")
 LOOP_LENGTHS = tuple(2.0 ** power for power in range(-5, 7))  # 1/32 ... 64 beats
 FLAGS = ("playing", "keylock", "loop", "loaded")
 
@@ -75,6 +76,7 @@ class DeckState:
 class VdjData:
     def __init__(self):
         self.decks = [DeckState(), DeckState()]
+        self.general = DeckState()  # encoder_mode ("0", "1" = VOLUME, "2" = SWING), master_volume, headphone_volume
         self.lock = threading.Lock()
         self.messages = 0
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -111,8 +113,9 @@ class VdjData:
         if len(message) < 2 or message[0] != SYSEX_ID:
             return
         field = message[1]
-        deck_index, name = (field >> 4) - 1, FIELDS.get(field & 0x0F)
-        if deck_index not in (0, 1) or name is None:
+        deck_index = (field >> 4) - 1
+        name = (GLOBAL_FIELDS if deck_index == 2 else FIELDS).get(field & 0x0F)
+        if deck_index not in (0, 1, 2) or name is None:
             return
         encoding = "utf-8" if name.endswith("_utf8") else "ascii"
         text = message[2:].decode(encoding, "replace").strip()
@@ -129,7 +132,7 @@ class VdjData:
             value = text == "1"
         else:
             value = text
-        deck = self.decks[deck_index]
+        deck = self.general if deck_index == 2 else self.decks[deck_index]
         with self.lock:
             self.messages += 1
             if deck.values.get(name) != value:

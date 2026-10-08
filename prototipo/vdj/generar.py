@@ -45,9 +45,27 @@ FIELDS = (
     (14, "LOADED", 1, "deck {n} loaded ? get_text '1' : get_text '0'"),
 )
 
+# Campos generales, sin deck (campo = 0x30 + código). $encmode lo pone el mapeo de la Maschine:
+# 1 = VOLUME (el encoder controla el master), 2 = SWING (auriculares)
+GLOBAL_DECK = 3
+GLOBAL_FIELDS = (
+    (1, "ENCMODE", 1, "var '$encmode' 1 ? get_text '1' : (var '$encmode' 2 ? get_text '2' : get_text '0')"),
+    (2, "MASTERVOL", 5, "master_volume & param_multiply 1000 & param_cast 'integer' & param_cast 'text' 5"),
+    (3, "HEADVOL", 5, "headphone_volume & param_multiply 1000 & param_cast 'integer' & param_cast 'text' 5"),
+)
+
 
 def element_name(deck, name):
-    return f"D{deck}_{name}"
+    return name if deck == GLOBAL_DECK else f"D{deck}_{name}"
+
+
+def all_fields():
+    """(deck, código, nombre, largo, acción, codificación) de cada salida."""
+    for deck in (1, 2):
+        for code, name, size, action, *encoding in FIELDS:
+            yield deck, code, name, size, action.format(n=deck), (encoding or ["ascii"])[0]
+    for code, name, size, action in GLOBAL_FIELDS:
+        yield GLOBAL_DECK, code, name, size, action, "ascii"
 
 
 def device_xml():
@@ -60,14 +78,14 @@ def device_xml():
         f'<device name="{DEVICE_NAME}" author="Santiago Jorda" description="Pantallas Maschine MK3 (datos)" '
         f'version="800" type="MIDI" decks="2" drivername="{PORT_NAME}" drivernameout="{PORT_NAME}">',
     ]
-    for deck in (1, 2):
-        for code, name, size, _, *encoding in FIELDS:
-            field = (deck << 4) | code
-            sysex = f"F07D{field:02X}" + "20" * size + "F7"
-            lines.append(
-                f'  <text sysex="{sysex}" offset="3" size="{size}" encoding="{(encoding or ["ascii"])[0]}" scroll="false" '
-                f'name="{element_name(deck, name)}" deck="{deck}" />'
-            )
+    for deck, code, name, size, _, encoding in all_fields():
+        field = (deck << 4) | code
+        sysex = f"F07D{field:02X}" + "20" * size + "F7"
+        deck_attribute = "" if deck == GLOBAL_DECK else f' deck="{deck}"'
+        lines.append(
+            f'  <text sysex="{sysex}" offset="3" size="{size}" encoding="{encoding}" scroll="false" '
+            f'name="{element_name(deck, name)}"{deck_attribute} />'
+        )
     lines.append("</device>")
     return "\n".join(lines) + "\n"
 
@@ -77,10 +95,9 @@ def mapper_xml():
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<mapper device="{DEVICE_NAME}" author="Santiago Jorda" version="800" date="2026-10-08">',
     ]
-    for deck in (1, 2):
-        for _, name, _, action, *_ in FIELDS:
-            escaped = action.format(n=deck).replace("&", "&amp;")
-            lines.append(f'  <map value="{element_name(deck, name)}" action="{escaped}" />')
+    for deck, _, name, _, action, _ in all_fields():
+        escaped = action.replace("&", "&amp;")
+        lines.append(f'  <map value="{element_name(deck, name)}" action="{escaped}" />')
     lines.append("</mapper>")
     return "\n".join(lines) + "\n"
 
