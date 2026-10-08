@@ -26,12 +26,12 @@ CHIP_ORANGE = (240, 140, 20)
 
 
 def _loop_text(beats):
-    if beats is None:
+    """1/16, 1/8, 1/4, 1/2, 1, 2, 4, 8..."""
+    if not beats:
         return "-"
-    for fraction, text in ((0.5, "1/2"), (0.25, "1/4"), (0.125, "1/8"), (0.0625, "1/16"), (0.03125, "1/32")):
-        if abs(beats - fraction) < 0.001:
-            return text
-    return f"{beats:g}"
+    if beats >= 1:
+        return str(round(beats))
+    return f"1/{round(1 / beats)}"
 
 
 def _sync_text(sync):

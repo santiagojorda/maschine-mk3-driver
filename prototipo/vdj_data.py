@@ -22,10 +22,27 @@ FIELDS = {
     1: "title", 2: "artist", 3: "bpm", 4: "bpm_original", 5: "playing", 6: "volume", 7: "filter",
     8: "sync", 9: "keylock", 10: "loop", 11: "loop_length", 12: "title_utf8", 13: "artist_utf8", 14: "loaded",
 }
-THOUSANDTHS = ("bpm", "bpm_original", "volume", "filter", "loop_length")
+THOUSANDTHS = ("bpm", "bpm_original", "volume", "filter")
+LOOP_LENGTHS = tuple(2.0 ** power for power in range(-5, 7))  # 1/32 ... 64 beats
 FLAGS = ("playing", "keylock", "loop", "loaded")
 
 _MIDI_DATA_CALLBACK = ctypes.WINFUNCTYPE(None, ctypes.c_void_p, ctypes.POINTER(ctypes.c_ubyte), W.DWORD, ctypes.c_void_p)
+
+
+def _parse_loop(text):
+    """Largo del loop en beats, al valor de la lista más cercano: VirtualDJ lo da como "4", "0.5" o "1/2"
+    (y la versión anterior del mapeo, en milésimas sin multiplicar: 4 -> "4" llegaba como 0.004)."""
+    try:
+        if "/" in text:
+            numerator, denominator = text.split("/", 1)
+            beats = float(numerator) / float(denominator)
+        else:
+            beats = float(text)
+    except (ValueError, ZeroDivisionError):
+        return None
+    if beats <= 0:
+        return None
+    return min(LOOP_LENGTHS, key=lambda length: abs(length - beats) / length)
 
 
 def _ascii_skeleton(text):
@@ -98,6 +115,10 @@ class VdjData:
             try:
                 value = int(text) / 1000
             except ValueError:
+                return
+        elif name == "loop_length":
+            value = _parse_loop(text)
+            if value is None:
                 return
         elif name in FLAGS:
             value = text == "1"

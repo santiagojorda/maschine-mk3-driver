@@ -17,12 +17,20 @@ HEADER_HEIGHT = 24
 SELECTED_MIN_BRIGHTNESS = 48  # mediana del gris de una línea de la fila seleccionada (las otras: 19 y 34)
 SELECTED_MIN_LINES = 12  # alto mínimo para que no cuente una línea suelta
 MAX_SCALE = 1.0  # no agranda: se vería borroso
+PLAYED_GUTTER = 30  # columna a la izquierda con la marca de "ya pasado"
+PLAYED_RED_MIN_WIDTH = 16  # la raya roja de "ya pasado" cruza todo el ícono; el globo rojo de TIDAL es más angosto
+PLAYED = (235, 40, 40)
 
 DEFAULT_LAYOUT = {
     # Coordenadas de la ventana de VirtualDJ (pantalla completa 1920 x 1200, skin PRO)
     "folders": {"title": "CARPETAS", "top": 596, "height": 592, "columns": [[50, 430]]},
-    # Título + artista y BPM
-    "songs": {"title": "TEMAS", "top": 618, "height": 540, "columns": [[610, 1030], [1105, 1195]]},
+    # Título + artista y BPM; played = columna del ícono, donde VirtualDJ raya en rojo los temas ya pasados.
+    # Las columnas se buscan en el encabezado (header_y, entre header_left y header_right): se corren si la
+    # lista cambia de ancho. Orden de VirtualDJ: portada, título, artista, duración, BPM...; "columns" queda
+    # por si no se encuentran.
+    "songs": {"title": "TEMAS", "top": 618, "height": 540, "columns": [[610, 1030], [1105, 1195]],
+              "played": [462, 506], "header_y": 597, "header_left": 480, "header_right": 1440,
+              "header_columns": [[1, 3], [4, 5]]},
 }
 
 _font_cache = {}
@@ -55,16 +63,49 @@ def _selected_row(lines):
     return best[0], best[1], float(np.median(medians[best[0]:best[1]]))
 
 
+def _row_bounds(lines):
+    """Filas de la lista como (arriba, abajo): VirtualDJ alterna el gris de fondo de una fila a la otra."""
+    background = np.median(lines.mean(axis=2), axis=1)
+    bounds, start = [], 0
+    for y in range(1, len(background)):
+        if abs(background[y] - background[y - 1]) > 5:
+            bounds.append((start, y))
+            start = y
+    bounds.append((start, len(background)))
+    return bounds
+
+
+def _played_rows(lines, icons):
+    """Filas con la raya roja de "ya pasado" en el ícono."""
+    red = (icons[..., 0] > 170) & (icons[..., 1] < 70) & (icons[..., 2] < 70)
+    line_has_mark = red.sum(axis=1) >= PLAYED_RED_MIN_WIDTH
+    return [(top, bottom) for top, bottom in _row_bounds(lines) if line_has_mark[top:bottom].any()]
+
+
 class BrowserView:
     def __init__(self, layout=None):
         self.layout = layout or DEFAULT_LAYOUT
         self.focus = "songs"
         self._last_center = {}  # si no se ve la selección (por ejemplo, al scrollear) se queda donde estaba
 
+    def _columns(self, window, zone):
+        """Columnas a mostrar, buscadas por los separadores del encabezado (líneas de 1 px oscuras)."""
+        if "header_y" not in zone:
+            return zone["columns"]
+        y, left, right = zone["header_y"], zone["header_left"], zone["header_right"]
+        band = window[y:y + 3, left:right].mean(axis=(0, 2))
+        separators = [left + x for x in range(1, len(band) - 1)
+                      if band[x] < 30 and band[x - 1] > 40 and band[x + 1] > 40]
+        needed = max(index for pair in zone["header_columns"] for index in pair)
+        if len(separators) <= needed:
+            return zone["columns"]
+        return [[separators[first], separators[last]] for first, last in zone["header_columns"]]
+
     def _lines(self, window, name):
         zone = self.layout[name]
         top, height = zone["top"], zone["height"]
-        return np.concatenate([window[top:top + height, left:right] for left, right in zone["columns"]], axis=1)
+        columns = self._columns(window, zone)
+        return np.concatenate([window[top:top + height, left:right] for left, right in columns], axis=1)
 
     def render_focused(self, window):
         """Imagen RGB (numpy) de 480 x 272 con la lista que tiene el foco en VirtualDJ."""
@@ -72,18 +113,28 @@ class BrowserView:
             return self._render(None, None, self.focus)
         lists = {name: self._lines(window, name) for name in self.layout}
         rows = {name: _selected_row(lines) if lines.size else None for name, lines in lists.items()}
+        zone = self.layout[self.focus]
+        played = []
+        if "played" in zone and lists[self.focus].size:
+            left, right = zone["played"]
+            played = _played_rows(lists[self.focus], window[zone["top"]:zone["top"] + zone["height"], left:right])
         if all(rows.values()):
             # La selección de la lista con el foco es la más clara; si quedan parecidas, no cambia
             folders, songs = rows["folders"][2], rows["songs"][2]
             if abs(folders - songs) >= 8:
                 self.focus = "folders" if folders > songs else "songs"
-        return self._render(lists[self.focus], rows[self.focus], self.focus)
+        return self._render(lists[self.focus], rows[self.focus], self.focus, played)
 
-    def _render(self, lines, row, name):
+    def _render(self, lines, row, name, played=()):
         image = Image.new("RGB", (WIDTH, HEIGHT))
         draw = ImageDraw.Draw(image)
         draw.rectangle((0, 0, WIDTH, HEADER_HEIGHT - 1), fill=(28, 28, 28))
         draw.text((8, 3), self.layout[name]["title"], font=_font(16), fill=(235, 235, 235))
+        gutter = PLAYED_GUTTER if "played" in self.layout[name] else 0
+        if gutter:
+            # Leyenda de la marca
+            draw.ellipse((WIDTH - 82, 7, WIDTH - 72, 17), fill=PLAYED)
+            draw.text((WIDTH - 66, 4), "pasado", font=_font(14), fill=(170, 170, 170))
         if lines is None:
             draw.text((8, HEADER_HEIGHT + 10), "VirtualDJ no está a la vista", font=_font(16), fill=(140, 140, 140))
             return np.asarray(image)
@@ -94,15 +145,19 @@ class BrowserView:
 
         # Ancho de la pantalla, sin agrandar; se ven las filas de alrededor de la seleccionada
         area = HEIGHT - HEADER_HEIGHT
-        scale = min(MAX_SCALE, WIDTH / lines.shape[1])
+        scale = min(MAX_SCALE, (WIDTH - gutter) / lines.shape[1])
         source_height = min(lines.shape[0], int(area / scale))
         first = min(max(center - source_height // 2, 0), lines.shape[0] - source_height)
         crop = Image.fromarray(np.ascontiguousarray(lines[first:first + source_height]))
         size = (round(crop.width * scale), round(crop.height * scale))
-        image.paste(crop.resize(size, Image.BILINEAR), (0, HEADER_HEIGHT))
+        image.paste(crop.resize(size, Image.BILINEAR), (gutter, HEADER_HEIGHT))
+        for top, bottom in played:
+            y = HEADER_HEIGHT + ((top + bottom) / 2 - first) * scale
+            if HEADER_HEIGHT + 6 <= y <= HEIGHT - 6:
+                draw.ellipse((gutter / 2 - 8, y - 8, gutter / 2 + 8, y + 8), fill=PLAYED)
         if row is not None:
             # Borde blanco en la fila seleccionada: el gris de VirtualDJ se nota poco en la Maschine
             y0 = HEADER_HEIGHT + (row[0] - first) * scale
             y1 = HEADER_HEIGHT + (row[1] - first) * scale - 1
-            draw.rectangle((0, max(y0, HEADER_HEIGHT), size[0] - 1, min(y1, HEIGHT - 1)), outline=(255, 255, 255), width=2)
+            draw.rectangle((0, max(y0, HEADER_HEIGHT), gutter + size[0] - 1, min(y1, HEIGHT - 1)), outline=(255, 255, 255), width=2)
         return np.asarray(image)

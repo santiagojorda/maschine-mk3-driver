@@ -38,7 +38,8 @@ FIELDS = (
     (8, "SYNC", 1, _SYNC),
     (9, "KEYLOCK", 1, "deck {n} key_lock ? get_text '1' : get_text '0'"),
     (10, "LOOP", 1, "deck {n} loop ? get_text '1' : get_text '0'"),
-    (11, "LOOPLEN", 10, "deck {n} get_loop & param_multiply 1000 & param_cast 'integer' & param_cast 'text' 10"),
+    # get_loop no se deja multiplicar: va el texto tal cual ("4", "0.5" o "1/2")
+    (11, "LOOPLEN", 10, "deck {n} get_loop & param_cast 'text' 10"),
     (12, "TITLEU", 60, "deck {n} get_title", "utf8"),
     (13, "ARTISTU", 40, "deck {n} get_artist", "utf8"),
     (14, "LOADED", 1, "deck {n} loaded ? get_text '1' : get_text '0'"),
