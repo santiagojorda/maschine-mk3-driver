@@ -1,103 +1,98 @@
-# maschine-mk3-driver
+# 🖥️ Maschine MK3 Screen Driver
 
-Driver propio para la Maschine MK3, para dejar de depender del programa de
-Native Instruments y usar las pantallas a gusto. Funciona con el mapeo de
-[maschine-mk3-ableton-virtualdj](https://github.com/santiagojorda/maschine-mk3-ableton-virtualdj)
-(Ableton Live + VirtualDJ).
+[![Ableton Live 12](https://img.shields.io/badge/Ableton%20Live-12%20Suite-00D2B4.svg)](https://www.ableton.com)
+[![Native Instruments](https://img.shields.io/badge/Hardware-Maschine%20MK3-black.svg)](https://www.native-instruments.com)
+[![Windows 11](https://img.shields.io/badge/OS-Windows%2011%20MIDI%20Services-0078D4.svg)](https://microsoft.com)
+[![Repo Principal](https://img.shields.io/badge/Repo-maschine--mk3--as--ableton--push-orange.svg)](https://github.com/santiagojorda/maschine-mk3-as-ableton-push)
+[![Manual Web](https://img.shields.io/badge/Manual-All%20Operations%20(Web)-brightgreen.svg)](https://santiagojorda.github.io/maschine-mk3-as-ableton-push/)
 
-- [PLAN.md](PLAN.md): el driver completo (Go, Windows primero, después Push 3 standalone).
-- [PROTOTIPO-HOY.md](PROTOTIPO-HOY.md): el prototipo de pantallas de VirtualDJ.
+Servidor y driver de pantallas USB para **Native Instruments Maschine MK3**, diseñado para renderizar la interfaz gráfica de **Ableton Live 12** en las dos pantallas LCD a color (480 × 272 c/u). 
 
-## Ejecutable
+Forma parte del proyecto **[maschine-mk3-as-ableton-push](https://github.com/santiagojorda/maschine-mk3-as-ableton-push)**.
 
-`construir_exe.bat` arma `dist\MaschineMK3AsPush\MaschineMK3AsPush.exe` (una carpeta con el programa y todo lo que
-necesita; no hace falta tener Python para usarlo, solo para armarlo).
+---
 
-| Comando | Qué hace |
+## ⚡ Cómo Funciona
+
+1. **Comunicación con Ableton Live:**
+   - El script MIDI de Ableton Live (`CustomMaschineMK3`) transmite su estado en tiempo real vía socket **UDP local (puerto 9017)**.
+   - Envía nombres de pistas, colores, clips activos, faders, vúmetros dinámicos, parámetros de plugins, árbol del browser y modos de encoder.
+
+2. **Renderizado en Pantallas:**
+   - El servidor procesa la telemetría y dibuja las vistas completas a **~20 fps** en formato **RGB565**.
+   - Envía los datos directamente por el endpoint USB Bulk (`0x04`) de la **interfaz 5** de la controladora (usando el driver WinUSB configurado en Zadig).
+   - Para maximizar rendimiento y fluidez, calcula diferencias (dirty rects) y refresca la pantalla completa periódicamente.
+
+3. **Modo Reposo inteligente (Standby):**
+   - Al presionar <kbd>SHIFT</kbd> + <kbd>CHANNEL</kbd>, apaga botones y pads, y muestra un salvapantallas con el logotipo oficial para proteger las pantallas y evitar toques involuntarios.
+
+---
+
+## 🚀 Ejecutable (`MaschineMK3AsPush.exe`)
+
+El script `construir_exe.bat` compila la aplicación autocontenida en `dist\MaschineMK3AsPush\MaschineMK3AsPush.exe` (no requiere tener Python instalado para usarla en vivo):
+
+| Comando | Acción |
 |---|---|
-| `MaschineMK3AsPush.exe` | Arranca las pantallas y el puerto de datos de VirtualDJ, sin ventana, y las reinicia si se caen o se cuelgan. Si ya está corriendo, avisa |
-| `MaschineMK3AsPush.exe --salir` | Lo detiene todo |
-| `MaschineMK3AsPush.exe --instalar-vdj` | Instala en VirtualDJ el dispositivo de datos (reiniciar VirtualDJ después) |
+| `MaschineMK3AsPush.exe` | Inicia el servicio de pantallas en segundo plano con supervisor automático (se reconecta solo si la Maschine se apaga o desconecta). |
+| `MaschineMK3AsPush.exe --salir` | Detiene y cierra todos los procesos del driver. |
 
-El registro (`pantallas.log`), la configuración (`config.json`) y el estado quedan en
-`%LOCALAPPDATA%\MaschineMK3AsPush\`. Para que arranque con Windows, poner un acceso directo al .exe en
-`shell:startup`.
+- **Ruta de datos:** El registro (`pantallas.log`), la configuración (`config.json`) y el estado se almacenan en:  
+  `%LOCALAPPDATA%\MaschineMK3AsPush\`
+- **Inicio automático:** Para que arranque automáticamente al iniciar Windows, colocá un acceso directo a `MaschineMK3AsPush.exe` dentro de `shell:startup`.
 
-## Estado
+---
 
-Prototipo en Python (`prototipo/`), **funcionando** (2026-10-07): en modo DJ
-(SAMPLING), la pantalla izquierda de la Maschine muestra en vivo las ondas de
-los dos decks de VirtualDJ a ~18 cuadros por segundo. MIXER / PLUGIN vuelven a
-modo Ableton. El programa de NI sigue manejando pads, botones y LEDs.
+## 🛠️ Desarrollo y Prototipo en Python
 
-Medido: la Maschine tarda ~50 ms en recibir una pantalla completa por USB
-(~5 MB/s), así que entran ~20 pantallas completas por segundo en total.
-Convertir la imagen tarda ~1 ms y no influye.
+Para ejecutar o modificar el código fuente directamente con Python 3.12:
 
-## Usar el prototipo
-
-1. Instalar dependencias (Python 3.12):
-
-   ```
-   python -m venv .venv
-   .venv\Scripts\pip install -r requirements.txt
-   ```
-
-2. Con **Zadig** (Options → List All Devices), poner **WinUSB** solo en
-   **"Maschine MK3 BD (Interface 5)"**. No tocar "Maschine MK3 (Interface 0)"
-   (la usa el programa de NI), "Maschine MK3 HID (Interface 4)" ni
-   "Maschine MK3 DFU (Interface 6)" (firmware). Después, desenchufar y volver
-   a enchufar la Maschine: hasta entonces la interfaz no queda habilitada.
-   Si Ableton o VirtualDJ estaban abiertos, reiniciarlos para que tomen los
-   puertos MIDI de nuevo, y volver a poner la Maschine en modo MIDI.
-
-3. Desde `prototipo/`, con el Python del venv:
-
-   | Comando | Qué hace |
-   |---|---|
-   | `python screen_test.py` | Imagen de prueba en las dos pantallas y fps |
-   | `python mode_watch.py --list` | Lista los puertos MIDI |
-   | `python mode_watch.py` | Imprime DJ / ABLETON al apretar SAMPLING / MIXER / PLUGIN |
-   | `python pick_region.py` | Elegir con el mouse las zonas de VirtualDJ |
-   | `python dj_screens.py` | El prototipo completo (`--start dj` arranca en modo DJ; `--midi-log` muestra el MIDI que llega) |
-
-4. Copiar `config.example.json` a `config.json`. Cada pantalla (`left`,
-   `right`) tiene:
-   - `regions`: zonas de la pantalla de la PC (las imprime `pick_region.py`),
-     apiladas de arriba a abajo. Vacío = pantalla en negro.
-   - `fit`: `contain` (entera, con bordes), `cover` (llena recortando) o
-     `stretch` (llena deformando).
-   - `fps`: cuadros por segundo. Entre las dos pantallas no pasar de ~20.
-
-   El ejemplo está hecho para VirtualDJ a pantalla completa en 1920×1200 con
-   el diseño PRO: las ondas de los dos decks, alrededor del punto de
-   reproducción.
-
-## Volver atrás (driver de NI en las pantallas)
-
-Administrador de dispositivos → la interfaz 5 de la Maschine → Desinstalar
-dispositivo (marcando borrar el driver) → desenchufar y volver a enchufar.
-
-**Si por error Zadig le pone WinUSB a la interfaz 0** (pasa si se elige mal
-en la lista; la Maschine deja de mandar MIDI y de prender luces): buscar el
-paquete que creó Zadig con `pnputil /enum-drivers` (nombre original
-`maschine_mk3_(interface_0).inf`) y, en una terminal de administrador:
-
-```
-pnputil /delete-driver oemNN.inf /uninstall /force
-pnputil /scan-devices
+### 1. Entorno virtual y dependencias
+```bash
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
 ```
 
-Después, desenchufar y volver a enchufar. Windows vuelve a usar el driver de
-NI (`nimc3usb.inf`).
+### 2. Configuración del Driver USB (Zadig)
+1. Abrí **[Zadig](https://zadig.akeo.ie/)** y marcá *Options → List All Devices*.
+2. Seleccioná únicamente **`Maschine MK3 BD (Interface 5)`**.
+3. Elegí **WinUSB** y hacé clic en **Install Driver**.
+4. Desconectá y volvé a conectar el cable USB de la controladora.
+   > ⚠️ **Importante:** No toques la interfaz 0 (MIDI nativo de NI) ni la interfaz 4 o 6.
 
-## Limitación conocida
+### 3. Scripts disponibles en `prototipo/`
+Desde la carpeta `prototipo/`:
 
-Mientras la interfaz 5 tiene WinUSB, el programa de NI no puede escribir en
-las pantallas: en modo Ableton se ve un cartel "ABLETON" en lugar del texto del
-script.
+| Script | Propósito |
+|---|---|
+| `python supervisor.py` | Supervisor principal que gestiona el ciclo de vida de las pantallas de Ableton. |
+| `python screen_test.py` | Imagen de prueba en ambas pantallas y medición de FPS por USB. |
+| `python mode_watch.py` | Monitor de eventos MIDI y cambios de modo de la Maschine. |
+| `python encoder_view.py` | Vista gráfica de los modos de encoder (Volumen Master, Cue y Tempo). |
 
-## Créditos
+---
 
-El protocolo de pantallas y la configuración de la MK3 vienen de
-[ni-controllers-lib](https://github.com/asutherland/ni-controllers-lib) (ISC).
+## 🔄 Volver al Driver de Fábrica de Native Instruments
+
+Si querés restaurar el driver original oficial de NI para la pantalla:
+
+1. Abrí el **Administrador de Dispositivos** (`devmgmt.msc`).
+2. En *Dispositivos de bus serie universal* (o *Universal Serial Bus devices*), buscá **`Maschine MK3 BD (Interface 5)`**.
+3. Clic derecho → **Desinstalar el dispositivo** (marcando la casilla de eliminar el controlador).
+4. Desconectá y reconectá el cable USB: Windows reinstalará automáticamente el driver original oficial de Native Instruments (`nimc3usb.inf`).
+
+> **Recuperación rápida por comando (si se asignó WinUSB a otra interfaz por error):**  
+> Identificá el paquete con `pnputil /enum-drivers` y ejecutá como Administrador:  
+> ```bash
+> pnputil /delete-driver oemNN.inf /uninstall /force
+> pnputil /scan-devices
+> ```
+
+---
+
+## 👤 Creador y Créditos
+
+- **Desarrollo y concepto:** Santiago Jorda (Maicol)  
+  - 📺 [Maicol Session en YouTube](https://www.youtube.com/watch?v=ImqHw-zkiZQ&list=PLxk2dEOPjuEYO00P264yMStEUhukVkO1y)  
+  - 📸 Instagram: [@santiagojorda](http://instagram.com/santiagojorda)
+- **Protocolo de pantallas y comunicación USB:** Basado en especificaciones de [ni-controllers-lib](https://github.com/asutherland/ni-controllers-lib).
