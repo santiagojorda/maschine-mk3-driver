@@ -1,8 +1,33 @@
 @echo off
 title Maschine MK3 Display Driver
 cd /d "%~dp0"
-rem El supervisor prende el puerto de datos de VirtualDJ y las pantallas, y las reinicia si se caen o se cuelgan.
-rem Normalmente ya arranca solo con Windows (acceso directo en la carpeta Inicio); si ya corre, este avisa y sale.
-echo Pantallas Maschine MK3 - registro en .venv\pantallas.log. Para salir, cerra esta ventana.
-.venv\Scripts\python prototipo\supervisor.py
+
+echo ========================================================
+echo   Iniciando Pantallas Maschine MK3 para Ableton Live 12
+echo ========================================================
+echo.
+
+if exist "MaschineMK3AsPush.exe" (
+    start "" "MaschineMK3AsPush.exe"
+    echo [+] Driver iniciado con ejecutable local.
+    goto :fin
+)
+
+if exist "dist\MaschineMK3AsPush\MaschineMK3AsPush.exe" (
+    start "" "dist\MaschineMK3AsPush\MaschineMK3AsPush.exe"
+    echo [+] Driver iniciado con dist\MaschineMK3AsPush\MaschineMK3AsPush.exe.
+    goto :fin
+)
+
+if exist ".venv\Scripts\python.exe" (
+    start "" ".venv\Scripts\python.exe" prototipo\supervisor.py
+    echo [+] Driver iniciado mediante Python (.venv).
+    goto :fin
+)
+
+echo [!] Error: No se encontro MaschineMK3AsPush.exe ni el entorno .venv.
+echo     Revisa docs\GUIA-INSTALACION.md para mas detalles.
 pause
+
+:fin
+timeout /t 3 >nul
