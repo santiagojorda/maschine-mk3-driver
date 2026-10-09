@@ -9,6 +9,8 @@
 [![YouTube Playlist](https://img.shields.io/badge/YouTube-Maicol%20Session-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=ImqHw-zkiZQ&list=PLxk2dEOPjuEYO00P264yMStEUhukVkO1y)
 [![Instagram](https://img.shields.io/badge/Instagram-@santiagojorda-E4405F?logo=instagram&logoColor=white)](http://instagram.com/santiagojorda)
 
+![Maschine MK3 as Ableton Push](docs/images/maschine-mk3-as-push-hero.jpg)
+
 Servidor y driver USB de alto rendimiento para **Native Instruments Maschine MK3**, diseñado para renderizar en tiempo real la interfaz gráfica nativa de **Ableton Live 12** en las dos pantallas LCD a color (480 × 272 c/u).
 
 Forma parte del ecosistema **[maschine-mk3-as-ableton-push](https://github.com/santiagojorda/maschine-mk3-as-ableton-push)** y permite visualizar grilla de clips (Session), faders y vúmetros (Mixer), controles de dispositivos/plugins y el navegador de samples directamente en el hardware, transformando la Maschine en un controlador estilo **Ableton Push**.
