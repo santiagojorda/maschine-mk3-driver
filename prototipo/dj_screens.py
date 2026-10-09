@@ -50,7 +50,7 @@ from window_capture import BackgroundWindowCapture
 
 STATS_EVERY_S = 5.0
 SCREEN_NAMES = ("left", "right")
-ABLETON_FPS = 30
+ABLETON_FPS = 20
 BROWSER_FPS = 12
 BROWSER_DISPLAY = 1  # derecha: la izquierda sigue con las ondas
 DECKS_DISPLAY = 1  # derecha, cuando no está el browser: estado de los decks
