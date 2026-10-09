@@ -8,6 +8,7 @@ interfaces que sigue usando el programa de NI.
 """
 
 import struct
+import sys
 import time
 
 import libusb_package
@@ -31,11 +32,14 @@ _END = b"\x40\x00\x00\x00"
 
 def rgb_to_rgb565(rgb):
     """Convierte un array (alto, ancho, 3) uint8 en bytes RGB565 big endian."""
-    r = rgb[..., 0].astype(np.uint16)
-    g = rgb[..., 1].astype(np.uint16)
-    b = rgb[..., 2].astype(np.uint16)
-    value = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
-    return value.astype(">u2").tobytes()
+    r = (rgb[..., 0].astype(np.uint16) & 0xF8) << 8
+    g = (rgb[..., 1].astype(np.uint16) & 0xFC) << 3
+    b = rgb[..., 2] >> 3
+    r |= g
+    r |= b
+    if sys.byteorder == "little":
+        r = r.byteswap()
+    return r.tobytes()
 
 
 def build_frame(display, x, y, width, height, pixels):
@@ -63,6 +67,8 @@ def changed_rects(previous, current, strips=4):
 
     x y el ancho quedan pares, así ancho x alto siempre es par (lo pide el protocolo).
     """
+    if previous is current or np.array_equal(previous, current):
+        return []
     diff = np.any(previous != current, axis=2)
     strip_width = WIDTH // strips
     rects = []

@@ -528,10 +528,9 @@ def main():
                           rgb = vdj_idle_left  # VirtualDJ cerrado o minimizado: la pantalla de reposo
                       else:
                           rgb = capture.grab_stack(screen["regions"], screen["fit"], screen["height"])
-                      frame = rgb.tobytes()
-                      if frame != last_sent[display]:
+                      if last_sent[display] is None or not np.array_equal(rgb, last_sent[display]):
                           displays.send_rgb(display, rgb, 0, (HEIGHT - screen["height"]) // 2)
-                          last_sent[display] = frame
+                          last_sent[display] = rgb.copy()
                           sent[display] += 1
                   except Exception as error:  # un cuadro perdido no corta el prototipo
                       report(f"Error en la pantalla {display}: {error}")
