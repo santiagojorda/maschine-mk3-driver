@@ -30,4 +30,4 @@ echo     Revisa docs\GUIA-INSTALACION.md para mas detalles.
 pause
 
 :fin
-timeout /t 3 >nul
+ping 127.0.0.1 -n 3 >nul

@@ -20,4 +20,4 @@ if exist "dist\MaschineMK3AsPush\MaschineMK3AsPush.exe" (
 :verificar
 taskkill /F /IM MaschineMK3AsPush.exe >nul 2>&1
 echo [+] Servicio de pantallas detenido.
-timeout /t 2 >nul
+ping 127.0.0.1 -n 2 >nul
