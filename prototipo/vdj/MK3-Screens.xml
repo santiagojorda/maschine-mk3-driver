@@ -37,4 +37,5 @@
   <text sysex="F07D3120F7" offset="3" size="1" encoding="ascii" scroll="false" name="ENCMODE" />
   <text sysex="F07D322020202020F7" offset="3" size="5" encoding="ascii" scroll="false" name="MASTERVOL" />
   <text sysex="F07D332020202020F7" offset="3" size="5" encoding="ascii" scroll="false" name="HEADVOL" />
+  <text sysex="F07D342020202020F7" offset="3" size="5" encoding="ascii" scroll="false" name="CROSSFADER" />
 </device>

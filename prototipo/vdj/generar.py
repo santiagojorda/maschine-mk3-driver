@@ -55,6 +55,7 @@ GLOBAL_FIELDS = (
     (1, "ENCMODE", 1, "var '$encmode' 1 ? get_text '1' : (var '$encmode' 2 ? get_text '2' : get_text '0')"),
     (2, "MASTERVOL", 5, "master_volume & param_multiply 1000 & param_cast 'integer' & param_cast 'text' 5"),
     (3, "HEADVOL", 5, "headphone_volume & param_multiply 1000 & param_cast 'integer' & param_cast 'text' 5"),
+    (4, "CROSSFADER", 5, "crossfader & param_multiply 1000 & param_cast 'integer' & param_cast 'text' 5"),
 )
 
 

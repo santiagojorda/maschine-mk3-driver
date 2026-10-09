@@ -539,6 +539,9 @@ def main():
 
               if switch_at is not None:
                   log.info(f"Cambio a DJ: primer cuadro a los {(time.perf_counter() - switch_at) * 1000:.0f} ms")
+                  if vdj_data is not None:
+                      with vdj_data.lock:
+                          vdj_data.general.changed_at["crossfader"] = time.perf_counter()
                   switch_at = None
               elapsed = time.perf_counter() - stats_start
               if elapsed >= STATS_EVERY_S:

@@ -33,4 +33,5 @@
   <map value="ENCMODE" action="var '$encmode' 1 ? get_text '1' : (var '$encmode' 2 ? get_text '2' : get_text '0')" />
   <map value="MASTERVOL" action="master_volume &amp; param_multiply 1000 &amp; param_cast 'integer' &amp; param_cast 'text' 5" />
   <map value="HEADVOL" action="headphone_volume &amp; param_multiply 1000 &amp; param_cast 'integer' &amp; param_cast 'text' 5" />
+  <map value="CROSSFADER" action="crossfader &amp; param_multiply 1000 &amp; param_cast 'integer' &amp; param_cast 'text' 5" />
 </mapper>

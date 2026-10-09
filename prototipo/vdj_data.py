@@ -38,8 +38,8 @@ FIELDS = {
     8: "sync", 9: "pitch_lock", 10: "loop", 11: "loop_length", 12: "title_utf8", 13: "artist_utf8", 14: "loaded",
     15: "position",
 }
-GLOBAL_FIELDS = {1: "encoder_mode", 2: "master_volume", 3: "headphone_volume"}  # campo 0x3_
-THOUSANDTHS = ("bpm", "bpm_original", "volume", "filter", "master_volume", "headphone_volume")
+GLOBAL_FIELDS = {1: "encoder_mode", 2: "master_volume", 3: "headphone_volume", 4: "crossfader"}  # campo 0x3_
+THOUSANDTHS = ("bpm", "bpm_original", "volume", "filter", "master_volume", "headphone_volume", "crossfader")
 LOOP_LENGTHS = tuple(2.0 ** power for power in range(-5, 7))  # 1/32 ... 64 beats
 FLAGS = ("playing", "pitch_lock", "loop", "loaded")
 
