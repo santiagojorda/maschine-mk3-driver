@@ -3,12 +3,19 @@
 [![Ableton Live 12](https://img.shields.io/badge/Ableton%20Live-12%20Suite-00D2B4.svg)](https://www.ableton.com)
 [![Native Instruments](https://img.shields.io/badge/Hardware-Maschine%20MK3-black.svg)](https://www.native-instruments.com)
 [![Windows 11](https://img.shields.io/badge/OS-Windows%2011%20MIDI%20Services-0078D4.svg)](https://microsoft.com)
+[![Release Driver](https://img.shields.io/badge/Release%20Driver-v1.0.0%20(Windows%20x64)-brightgreen.svg)](https://github.com/santiagojorda/maschine-mk3-driver/releases/latest)
 [![Repo Principal](https://img.shields.io/badge/Repo-maschine--mk3--as--ableton--push-orange.svg)](https://github.com/santiagojorda/maschine-mk3-as-ableton-push)
 [![Manual Web](https://img.shields.io/badge/Manual-All%20Operations%20(Web)-brightgreen.svg)](https://santiagojorda.github.io/maschine-mk3-as-ableton-push/)
+[![YouTube Playlist](https://img.shields.io/badge/YouTube-Maicol%20Session-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=ImqHw-zkiZQ&list=PLxk2dEOPjuEYO00P264yMStEUhukVkO1y)
+[![Instagram](https://img.shields.io/badge/Instagram-@santiagojorda-E4405F?logo=instagram&logoColor=white)](http://instagram.com/santiagojorda)
 
-Servidor y driver de pantallas USB para **Native Instruments Maschine MK3**, diseñado para renderizar la interfaz gráfica de **Ableton Live 12** en las dos pantallas LCD a color (480 × 272 c/u). 
+Servidor y driver USB de alto rendimiento para **Native Instruments Maschine MK3**, diseñado para renderizar en tiempo real la interfaz gráfica nativa de **Ableton Live 12** en las dos pantallas LCD a color (480 × 272 c/u).
 
-Forma parte del proyecto **[maschine-mk3-as-ableton-push](https://github.com/santiagojorda/maschine-mk3-as-ableton-push)**.
+Forma parte del ecosistema **[maschine-mk3-as-ableton-push](https://github.com/santiagojorda/maschine-mk3-as-ableton-push)** y permite visualizar grilla de clips (Session), faders y vúmetros (Mixer), controles de dispositivos/plugins y el navegador de samples directamente en el hardware, transformando la Maschine en un controlador estilo **Ableton Push**.
+
+🌐 **Sitio Web & Manual:** [santiagojorda.github.io/maschine-mk3-as-ableton-push](https://santiagojorda.github.io/maschine-mk3-as-ableton-push/)  
+📦 **Descarga Directa (EXE):** [Última Release en GitHub](https://github.com/santiagojorda/maschine-mk3-driver/releases/latest)  
+🔗 **Repositorio Principal:** [maschine-mk3-as-ableton-push](https://github.com/santiagojorda/maschine-mk3-as-ableton-push)
 
 ---
 
@@ -99,3 +106,10 @@ Para más detalles, consultá la **[Guía de Instalación y Restauración](docs/
   - 📺 [Maicol Session en YouTube](https://www.youtube.com/watch?v=ImqHw-zkiZQ&list=PLxk2dEOPjuEYO00P264yMStEUhukVkO1y)  
   - 📸 Instagram: [@santiagojorda](http://instagram.com/santiagojorda)
 - **Protocolo de pantallas y comunicación USB:** Basado en especificaciones de [ni-controllers-lib](https://github.com/asutherland/ni-controllers-lib).
+
+[![Maicol Session: Ableton Push + Maschine MK3](https://img.youtube.com/vi/ImqHw-zkiZQ/maxresdefault.jpg)](https://www.youtube.com/watch?v=ImqHw-zkiZQ&list=PLxk2dEOPjuEYO00P264yMStEUhukVkO1y)
+
+---
+
+`#maschine-mk3` `#ableton-live` `#ableton-push` `#usb-driver` `#midi-controller` `#winusb` `#display-driver` `#native-instruments`
+
