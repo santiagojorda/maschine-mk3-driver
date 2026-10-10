@@ -49,10 +49,10 @@ FIELDS = (
 )
 
 # Campos generales, sin deck (campo = 0x30 + código). $encmode lo pone el mapeo de la Maschine:
-# 1 = VOLUME (el encoder controla el master), 2 = SWING (auriculares)
+# 1 = VOLUME (el encoder controla el master), 2 = SWING (auriculares), 3 = TEMPO (el tempo de Ableton)
 GLOBAL_DECK = 3
 GLOBAL_FIELDS = (
-    (1, "ENCMODE", 1, "var '$encmode' 1 ? get_text '1' : (var '$encmode' 2 ? get_text '2' : get_text '0')"),
+    (1, "ENCMODE", 1, "var '$encmode' 1 ? get_text '1' : (var '$encmode' 2 ? get_text '2' : (var '$encmode' 3 ? get_text '3' : get_text '0'))"),
     (2, "MASTERVOL", 5, "master_volume & param_multiply 1000 & param_cast 'integer' & param_cast 'text' 5"),
     (3, "HEADVOL", 5, "headphone_volume & param_multiply 1000 & param_cast 'integer' & param_cast 'text' 5"),
     (4, "CROSSFADER", 5, "crossfader & param_multiply 1000 & param_cast 'integer' & param_cast 'text' 5"),

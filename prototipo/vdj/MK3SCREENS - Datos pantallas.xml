@@ -30,7 +30,7 @@
   <map value="D2_ARTISTU" action="deck 2 get_artist" />
   <map value="D2_LOADED" action="deck 2 loaded ? get_text '1' : get_text '0'" />
   <map value="D2_POS" action="deck 2 get_position &amp; param_multiply 10000 &amp; param_cast 'integer' &amp; param_cast 'text' 6" />
-  <map value="ENCMODE" action="var '$encmode' 1 ? get_text '1' : (var '$encmode' 2 ? get_text '2' : get_text '0')" />
+  <map value="ENCMODE" action="var '$encmode' 1 ? get_text '1' : (var '$encmode' 2 ? get_text '2' : (var '$encmode' 3 ? get_text '3' : get_text '0'))" />
   <map value="MASTERVOL" action="master_volume &amp; param_multiply 1000 &amp; param_cast 'integer' &amp; param_cast 'text' 5" />
   <map value="HEADVOL" action="headphone_volume &amp; param_multiply 1000 &amp; param_cast 'integer' &amp; param_cast 'text' 5" />
   <map value="CROSSFADER" action="crossfader &amp; param_multiply 1000 &amp; param_cast 'integer' &amp; param_cast 'text' 5" />

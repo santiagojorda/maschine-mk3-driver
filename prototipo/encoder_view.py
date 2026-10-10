@@ -84,12 +84,25 @@ def render_ableton(encoder, vdj=None):
     return image
 
 
-def dj_encoder(data):
-    """Imagen de VOLUME / SWING en modo DJ, o None si el encoder está en el browser (data: VdjData)."""
+TEMPO_RANGE = (60.0, 200.0)  # lo mismo que TEMPO_SCREEN_RANGE del script de Ableton
+
+
+def tempo_encoder(tempo, vdj=None):
+    """La vista de tempo (el de Ableton, también cuando se la abre desde el modo DJ). tempo: BPM o None."""
+    low, high = TEMPO_RANGE
+    value = 0.0 if tempo is None else max(0.0, min(1.0, (tempo - low) / (high - low)))
+    return render_ableton({"mode": TEMPO, "value": value, "text": f"{tempo:.2f} BPM" if tempo else "-"}, vdj)
+
+
+def dj_encoder(data, tempo=None, vdj=None):
+    """Imagen de VOLUME / SWING / TEMPO en modo DJ, o None si el encoder está en el browser (data: VdjData).
+    tempo: el tempo de Ableton que mandó el script; vdj: (deck, BPM) del deck de referencia."""
     if data is None:
         return None
     with data.lock:
         general = data.general
+        if general.get("encoder_mode") == "3":
+            return tempo_encoder(tempo, vdj)
         mode = {"1": VOLUME, "2": SWING}.get(general.get("encoder_mode"))
         if mode is None:
             return None

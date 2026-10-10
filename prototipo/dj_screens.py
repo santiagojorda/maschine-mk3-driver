@@ -491,7 +491,8 @@ def main():
                           sent[display] += 1
                       last_frame[display] = vdj_idle_right
                       continue
-                  encoder_image = dj_encoder(vdj_data) if display == ENCODER_DISPLAY else None
+                  encoder_image = (dj_encoder(vdj_data, ableton_text.tempo(), master_bpm.last_found)
+                                   if display == ENCODER_DISPLAY else None)
                   if encoder_image is not None:
                       # VOLUME / SWING: la misma vista que en Ableton
                       next_due[display] = now + 1.0 / DECKS_FPS
