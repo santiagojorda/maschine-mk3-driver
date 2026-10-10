@@ -46,6 +46,7 @@ from encoder_view import dj_encoder
 from encoder_view import render_ableton as render_ableton_encoder
 from vdj_browser import BrowserView
 from vdj_data import BRIDGE_ADDRESS, VdjData
+from vdj_master import MasterBpmSender
 from window_capture import BackgroundWindowCapture
 
 STATS_EVERY_S = 5.0
@@ -278,6 +279,8 @@ def main():
         on_message=(lambda message: log.info(f"MIDI {message}")) if args.midi_log else None,
     )
     ableton_text = AbletonText(config["ableton_text_port"])
+    master_bpm = MasterBpmSender(is_open=lambda: capture.process_started() is not None
+                                 if hasattr(capture, "process_started") else True)
     start_vdj_port()
     try:
         vdj_data = VdjData()
@@ -344,6 +347,7 @@ def main():
               if watcher.sync(ableton_text.reported_mode()):
                   log.info("(modo tomado del script de Ableton)")
               new_mode = watcher.mode
+              master_bpm.maybe_send(vdj_data)
               if time.perf_counter() - last_full_refresh >= FULL_REFRESH_SECONDS:
                   last_full_refresh = time.perf_counter()
                   last_sent = [None, None]
@@ -415,7 +419,7 @@ def main():
                   for display in range(2):
                       try:
                           if display == ENCODER_DISPLAY and encoder:
-                              image = render_ableton_encoder(encoder)
+                              image = render_ableton_encoder(encoder, master_bpm.last_found)
                           elif graphics:
                               # Session, mixer o dispositivo: solo se manda lo que cambió
                               image = render_ui_screen(smoothed, display)
@@ -561,6 +565,7 @@ def main():
     finally:
         watcher.close()
         ableton_text.close()
+        master_bpm.close()
         if vdj_data is not None:
             vdj_data.close()
         capture.close()

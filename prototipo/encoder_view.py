@@ -8,7 +8,7 @@ posición y, para el master, el medidor de salida.
 
 from PIL import Image, ImageDraw
 
-from ableton_ui import BACKGROUND, GROOVE, TEXT, _centered, _font, _meter_color, _text_color_on
+from ableton_ui import BACKGROUND, DIM_TEXT, GROOVE, TEXT, _centered, _font, _meter_color, _text_color_on
 from maschine_display import HEIGHT, WIDTH
 
 VOLUME = "volume"
@@ -49,9 +49,39 @@ def render_encoder(mode, value, text, source, meter=None):
     return image
 
 
-def render_ableton(encoder):
-    """encoder: el campo "encoder" del estado del script (mode, value, text, meter)."""
-    return render_encoder(encoder.get("mode"), encoder.get("value"), encoder.get("text"), "ABLETON", encoder.get("meter"))
+def _ableton_bpm(text):
+    try:
+        return float(str(text).split()[0])
+    except (ValueError, IndexError):
+        return None
+
+
+def _draw_vdj_tempo(image, ableton_bpm, vdj):
+    """El tempo del deck de referencia de VirtualDJ, chico, abajo, para compararlo con el de Ableton.
+    vdj: (índice del deck, BPM). Verde si coinciden (menos de 0,05 BPM de diferencia), naranja si no."""
+    draw = ImageDraw.Draw(image)
+    deck, bpm = vdj
+    difference = None if ableton_bpm is None else bpm - ableton_bpm
+    same = difference is not None and abs(difference) < 0.05
+    color = (80, 210, 120) if same else (255, 170, 60)
+    top = HEIGHT - 44
+    draw.line((30, top - 6, WIDTH - 30, top - 6), fill=GROOVE)
+    draw.text((30, top + 6), f"VDJ  DECK {deck + 1}", font=_font(14, True), fill=DIM_TEXT)
+    value = f"{bpm:.2f}"
+    width = draw.textlength(value, font=_font(26, True))
+    draw.text((WIDTH // 2 - width // 2 + 20, top), value, font=_font(26, True), fill=TEXT)
+    note = "IGUAL" if same else (f"{difference:+.2f}" if difference is not None else "")
+    width = draw.textlength(note, font=_font(16, True))
+    draw.text((WIDTH - 30 - width, top + 8), note, font=_font(16, True), fill=color)
+
+
+def render_ableton(encoder, vdj=None):
+    """encoder: el campo "encoder" del estado del script (mode, value, text, meter).
+    vdj: (deck, BPM) del deck de referencia de VirtualDJ, o None; solo se dibuja en el modo TEMPO."""
+    image = render_encoder(encoder.get("mode"), encoder.get("value"), encoder.get("text"), "ABLETON", encoder.get("meter"))
+    if vdj is not None and encoder.get("mode") == TEMPO:
+        _draw_vdj_tempo(image, _ableton_bpm(encoder.get("text")), vdj)
+    return image
 
 
 def dj_encoder(data):

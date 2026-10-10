@@ -6,3 +6,5 @@ build/
 dist/
 *.spec
 prototipo/icono.ico
+build_*/
+dist_*/
