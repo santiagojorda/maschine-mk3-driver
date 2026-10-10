@@ -42,7 +42,7 @@ import registro
 from leds import blank_leds
 from paths import DATA_DIR, child_command, config_path
 from dj_info import render_decks
-from encoder_view import dj_encoder
+from encoder_view import dj_encoder, tempo_encoder
 from encoder_view import render_ableton as render_ableton_encoder
 from vdj_browser import BrowserView
 from vdj_data import BRIDGE_ADDRESS, VdjData
@@ -316,6 +316,7 @@ def main():
     ableton_state_mark = 0
     capture_mark = None  # al entrar a DJ: cuántas capturas había; se espera una más antes de dibujar
     capture_deadline = 0.0
+    flash_seen = 0  # versión de la vista de tempo pasajera que ya se atendió
 
     def blank_unused_bands():
         # Si la zona capturada de una pantalla no la llena (height < 272), el resto tiene que quedar en negro
@@ -348,6 +349,10 @@ def main():
                   log.info("(modo tomado del script de Ableton)")
               new_mode = watcher.mode
               master_bpm.maybe_send(vdj_data)
+              flash = ableton_text.tempo_flash()
+              if ableton_text.flash_version != flash_seen:
+                  flash_seen = ableton_text.flash_version
+                  next_due = [0.0, 0.0]  # se dibuja ya, sin esperar el próximo cuadro
               if time.perf_counter() - last_full_refresh >= FULL_REFRESH_SECONDS:
                   last_full_refresh = time.perf_counter()
                   last_sent = [None, None]
@@ -418,7 +423,9 @@ def main():
                       smoothed = dict(smoothed, popups=popup_tracker.update(touched_knobs(state)))
                   for display in range(2):
                       try:
-                          if display == ENCODER_DISPLAY and encoder:
+                          if display == ENCODER_DISPLAY and flash:
+                              image = tempo_encoder(flash, master_bpm.last_found)  # vista de tempo pasajera
+                          elif display == ENCODER_DISPLAY and encoder:
                               image = render_ableton_encoder(encoder, master_bpm.last_found)
                           elif graphics:
                               # Session, mixer o dispositivo: solo se manda lo que cambió
@@ -491,8 +498,11 @@ def main():
                           sent[display] += 1
                       last_frame[display] = vdj_idle_right
                       continue
-                  encoder_image = (dj_encoder(vdj_data, ableton_text.tempo(), master_bpm.last_found)
-                                   if display == ENCODER_DISPLAY else None)
+                  if display == ENCODER_DISPLAY and flash:
+                      encoder_image = tempo_encoder(flash, master_bpm.last_found)  # vista de tempo pasajera
+                  else:
+                      encoder_image = (dj_encoder(vdj_data, ableton_text.tempo(), master_bpm.last_found)
+                                       if display == ENCODER_DISPLAY else None)
                   if encoder_image is not None:
                       # VOLUME / SWING: la misma vista que en Ableton
                       next_due[display] = now + 1.0 / DECKS_FPS

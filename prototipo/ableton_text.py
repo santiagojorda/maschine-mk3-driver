@@ -51,6 +51,8 @@ class AbletonText:
         self.state_version = 0
         self._reported = (None, 0.0)
         self._tempo = (None, 0.0)  # tempo de Ableton que manda el script en modo DJ
+        self._flash = (None, 0.0)  # (BPM, hasta cuándo) de la vista de tempo pasajera de SHIFT + TEMPO
+        self.flash_version = 0
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._socket.bind(("127.0.0.1", port))
         self._socket.settimeout(0.5)
@@ -81,6 +83,11 @@ class AbletonText:
                 return
             with self._lock:
                 now = time.perf_counter()
+                if state.get("type") == "tempo_flash":
+                    # SHIFT + TEMPO igualó el tempo: la vista de tempo se ve unos segundos, en cualquier vista
+                    self._flash = (state.get("bpm"), now + float(state.get("seconds", 3.0)))
+                    self.flash_version += 1
+                    return
                 if state.get("type") == "tempo":
                     # En modo DJ, con el encoder en TEMPO: el tempo de Live para la vista de tempo
                     self._tempo = (state.get("bpm"), now)
@@ -122,6 +129,12 @@ class AbletonText:
         with self._lock:
             bpm, when = self._tempo
             return bpm if bpm and time.perf_counter() - when <= max_age else None
+
+    def tempo_flash(self):
+        """El tempo (BPM) de la vista de tempo pasajera, o None si no hay una activa."""
+        with self._lock:
+            bpm, until = self._flash
+            return bpm if bpm and time.perf_counter() < until else None
 
     def state(self, max_age=1.0):
         """El último estado JSON, o None si no llegó o es viejo (el script dejó de mandarlo)."""
