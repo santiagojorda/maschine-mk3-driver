@@ -35,6 +35,7 @@ SINGLE_INSTANCE_ADDRESS = ("127.0.0.1", 9020)
 HEARTBEAT_TIMEOUT = 15.0  # sin pulso por más que esto = colgado
 STARTUP_GRACE = 30.0  # al arrancar puede tardar (Windows recién iniciado, la Maschine apagada...)
 CHECK_EVERY = 1.0
+RESTART_MIN_SECONDS = 5.0  # entre dos reinicios pedidos desde la Maschine
 
 
 class Log:
@@ -85,6 +86,7 @@ class Screens:
         self.process = None
         self.started = 0.0
         self.failures = []  # horas de las últimas caídas, para esperar más si se cae seguido
+        self.last_requested = 0.0
 
     def start(self):
         environment = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
@@ -129,6 +131,16 @@ class Screens:
         self.process = None
         now = time.time()
         self.failures = [moment for moment in self.failures if now - moment < 300] + [now]
+
+    def restart_requested(self):
+        """Pedido desde la Maschine (SHIFT + MACRO): cierra las pantallas en orden; check() las vuelve a lanzar.
+        Con un mínimo entre pedidos, para que apretarlo varias veces no apile reinicios."""
+        if time.time() - self.last_requested < RESTART_MIN_SECONDS:
+            self._log.write("[supervisor] pedido de reinicio ignorado: hace muy poco que se reinició")
+            return
+        self.last_requested = time.time()
+        self._log.write("[supervisor] reinicio de las pantallas pedido desde la Maschine (SHIFT + MACRO)")
+        self.stop_gracefully(timeout=4.0)
 
     def backoff(self):
         # 2 s la primera vez, y el doble por cada caída de los últimos 5 minutos, hasta 60 s
@@ -198,9 +210,12 @@ def main():
                     start_vdj_port(log)
                     time.sleep(1.0)  # que el puerto exista antes de que dj_screens.py lo busque
             try:
-                if lock.recvfrom(64)[0] == b"salir":
+                message = lock.recvfrom(64)[0]
+                if message == b"salir":
                     log.write("[supervisor] cerrado con --salir")
                     break
+                if message == b"reiniciar":
+                    screens.restart_requested()
             except OSError:
                 pass  # nada pendiente
             screens.check()

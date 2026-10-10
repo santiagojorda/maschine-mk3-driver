@@ -129,41 +129,6 @@ def _draw_crossfader(draw, crossfader):
     draw.line((thumb_x, y_mid - 4, thumb_x, y_mid + 4), fill=(20, 20, 20))
 
 
-def _draw_crossfader_popup(draw, crossfader, now, changed_at):
-    if crossfader is None or now - changed_at >= POPUP_SECONDS:
-        return
-    xf = max(0.0, min(1.0, crossfader))
-    if xf <= 0.02:
-        val_text = "DECK 1 (100%)"
-        banner_color = DECK_COLORS[0]
-    elif xf >= 0.98:
-        val_text = "DECK 2 (100%)"
-        banner_color = DECK_COLORS[1]
-    elif 0.47 <= xf <= 0.53:
-        val_text = "CENTRO (0%)"
-        banner_color = (90, 90, 90)
-    elif xf < 0.47:
-        val_text = f"DECK 1 ({round((0.5 - xf) * 200)}%)"
-        banner_color = DECK_COLORS[0]
-    else:
-        val_text = f"DECK 2 ({round((xf - 0.5) * 200)}%)"
-        banner_color = DECK_COLORS[1]
-
-    box = (130, 26, 350, PANEL_HEIGHT - 6)
-    draw.rectangle(box, fill=(18, 18, 18), outline=TEXT, width=2)
-    draw.rectangle((box[0] + 2, box[1] + 2, box[2] - 2, box[1] + 26), fill=banner_color)
-    center = (box[0] + box[2]) // 2
-    _centered(draw, "CROSSFADER", center, box[1] + 6, _font(15, True), _text_color_on(banner_color), width=box[2] - box[0] - 10)
-    _centered(draw, val_text, center, box[1] + 44, _font(24, True), TEXT, width=box[2] - box[0] - 10)
-    # Mini barra dentro del popup
-    bar_y = box[1] + 82
-    draw.rectangle((box[0] + 20, bar_y - 2, center, bar_y + 2), fill=(0, 60, 100))
-    draw.rectangle((center, bar_y - 2, box[2] - 20, bar_y + 2), fill=(100, 20, 30))
-    draw.line((center, bar_y - 4, center, bar_y + 4), fill=(150, 150, 150))
-    p_thumb = (box[0] + 20) + int(xf * ((box[2] - 20) - (box[0] + 20)))
-    draw.rectangle((p_thumb - 3, bar_y - 5, p_thumb + 3, bar_y + 5), fill=(255, 255, 255))
-
-
 def _draw_volume(draw, column, value, label, color):
     x0 = column * COLUMN_WIDTH
     center = x0 + COLUMN_WIDTH // 2
@@ -227,7 +192,6 @@ def render_decks(data, warning=None):
     with data.lock:
         decks = data.decks
         crossfader = data.general.get("crossfader")
-        xf_changed_at = data.general.changed_at.get("crossfader", -POPUP_SECONDS)
         for index, deck in enumerate(decks):
             _draw_panel(draw, index, deck)
         draw.line((PANEL_WIDTH, 4, PANEL_WIDTH, PANEL_HEIGHT - 4), fill=(40, 40, 40))
@@ -240,7 +204,6 @@ def render_decks(data, warning=None):
             _draw_filter(draw, 2 + index, deck.get("filter"), f"FILTRO {index + 1}", DECK_COLORS[index])
         for index, deck in enumerate(decks):
             _draw_popup(draw, index, deck, now)
-        _draw_crossfader_popup(draw, crossfader, now, xf_changed_at)
     if warning:
         _draw_warning(draw, warning)
     return image
