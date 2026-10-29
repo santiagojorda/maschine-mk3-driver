@@ -1,6 +1,6 @@
 """Paso 3: pinta barras de colores en la pantalla 0 y un degradé en la 1, y mide los fps.
 
-Uso: python screen_test.py [--frames 60]
+Uso: python -m maschine_mk3_driver.screen_test [--frames 60]
 """
 
 import argparse
@@ -8,7 +8,7 @@ import time
 
 import numpy as np
 
-from maschine_display import HEIGHT, WIDTH, MaschineDisplays
+from .display import HEIGHT, WIDTH, MaschineDisplays
 
 
 def color_bars():

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maschine-mk3-driver"
+version = "0.1.0"
+description = "Driver de las pantallas de la Maschine MK3 por USB (sin el software de Native Instruments)"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Santiago Jorda" }]
+dependencies = [
+    "pyusb",
+    "libusb-package",
+    "numpy",
+    "pillow",
+    "mss",  # screen_capture
+]
+
+[tool.setuptools]
+packages = ["maschine_mk3_driver"]

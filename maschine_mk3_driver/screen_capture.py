@@ -6,7 +6,7 @@ import mss
 import numpy as np
 from PIL import Image
 
-from maschine_display import HEIGHT, WIDTH
+from .display import HEIGHT, WIDTH
 
 
 def set_dpi_aware():

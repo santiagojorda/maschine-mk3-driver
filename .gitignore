@@ -1,10 +1,11 @@
 __pycache__/
 *.pyc
 .venv/
-prototipo/config.json
+*.egg-info/
 build/
 dist/
 *.spec
-prototipo/icono.ico
+# Restos de cuando las pantallas vivian aca (ahora en maschine-mk3-as-ableton-push/Pantallas)
+prototipo/
 build_*/
 dist_*/

@@ -17,8 +17,8 @@ import time
 import numpy as np
 from PIL import Image
 
-from maschine_display import HEIGHT, WIDTH
-from screen_capture import fit_image
+from .display import HEIGHT, WIDTH
+from .screen_capture import fit_image
 
 PW_RENDERFULLCONTENT = 0x2
 DIB_RGB_COLORS = 0
